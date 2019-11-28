@@ -6,11 +6,11 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#ifndef UNIT_TEST
-#include "predefined.h"
-#else
-#include "util/unit_test_predefined.h"
-#endif
+// #ifndef UNIT_TEST
+// #include "predefined.h"
+// #else
+// #include "util/unit_test_predefined.h"
+// #endif
 
 namespace bpt {
 
@@ -19,92 +19,139 @@ namespace bpt {
 #define OFFSET_BLOCK OFFSET_META + sizeof(meta_t)
 #define SIZE_NO_CHILDREN sizeof(leaf_node_t) - BP_ORDER * sizeof(record_t)
 
+#define BP_ORDER 20
+
 static enum page_type{PRIMARY_KEY, INDEX_KEY, DATA};
 
 /* meta information of B+ tree */
-typedef struct {
-    size_t key_size;   /* size of key */
-    size_t internal_node_num; /* how many internal nodes */
-    size_t leaf_node_num;     /* how many leafs */
-    size_t height;            /* height of tree (exclude leafs) */
-    off_t slot;        /* where to store new block */
-    off_t root_offset; /* where is the root of internal nodes */
-    off_t leaf_offset; /* where is the first leaf */
-    size_t page_count; /* how many pages */
-} meta_t;
 
-/* page header */
+// two kinds of meta header ((index)key and data) 
+/* contains node(internal and leaf node) */
+/* standord size(60)+4 = 64 Bytes */
+struct key_meta_t{
+    int height;            /* height of tree (exclude leafs) */
+    int key_size;   /* size of key */
+    int internal_node_num; /* how many internal nodes */
+    int leaf_node_num;     /* how many leafs */
+    unsigned int root_offset; /* where is the root of internal nodes */
+    unsigned int leaf_offset; /* where is the first leaf */
+    unsigned int page_count; /* how many pages */
+    unsigned int un_count;  /* unsorted_map link area count  */
+    unsigned int max_size;  /* max_unsorted size */
+    size_t unsorted;    /* empty key area lnk (when insert few data it will will be used) */ 
+    size_t max_unsorted;    /* max size unsorted */
+
+    size_t slot;        /* where to store new block */
+};
+using key_meta_header = struct key_meta_t;
+
+/* standord size(40) Bytes */
+struct data_meta_t{
+    unsigned short data_count;  /* data count */
+    size_t begin_offset; /* where is the root of internal nodes */
+    size_t slot;        /* where to store new block */
+    size_t unsorted;    /* empty key area lnk (when insert few data it will will be used) */ 
+    size_t max_unsorted;    /* max size unsorted */
+    unsigned int un_count;  /* unsorted_map link area count  */
+    unsigned int max_size;  /* max_unsorted size */
+};
+using data_meta_header = data_meta_t;
+
+
+/* page header size(16) Bytes*/
 struct page_t{
-    size_t page_id;
-    short record_type;
-    short free_space;
+    char page_id;   /* page_id */
+    short record_type;  /* 记录的数据类型(data  (index)key) */
+
+    short free_space;   /* free space */
     short row_space;
-    short row_direc_space;
-    float free_ratio;
+    short row_dic_size;
+
     short data_offset;
+    float free_ratio;
 };
 using page_header = page_t;
 
 
-/* row header */
+/* row header (standord (16 Bytes))*/
 struct row_t{
-    short row_len;
-    char status;    /* 0碎片，1索引记录，2普通记录 */
-    char column_count;
-    short null_map_size;
-    short point_map;    /* point size is  */
-    /* add the column size before the cloumn data */
+    char status;    /* 0碎片，1普通记录, 2他处数据引用(data_len可用，其他无用) */
+    /* char unused */
+    unsigned short null_map_size; /* field */
+    short null_map; // a part of null_map if sizeof(null_map) > 16 there will be new null_map after row_t but before data
+    size_t next;  /* --row_id-- like pointer point to next raw  (64 = 50 + 12 ) 
+                    50 stand for page_id and 12 stand for the address of a row in per page */  
+    /* null_map */
     /* data */
 };
 using row_header = row_t;
 
+
+
 /* row directory */
+// 即使删除 空间不会回收 所以不需要标记id, 顺着来就行, 中间空间合并后后续顺序也不变，因为id只是个标志而已, 不一定有顺序
 struct row_direc_t{
-    short row_len;
-    off_t row_id;
-    off_t offset;
+    short row_len;  // 第一位为1时是负数，表示此块被弃用, 表示被前或后合并掉了
+    short offset;
 };
 using row_dic = row_direc_t;
 
+
+
+
+
+
+
+
 /* internal nodes' index segment */
+template<class key_t>
 struct index_t {
-    key_t key;
-    off_t child; /* child's offset */
+    key_t key;      /* according to the condition, it will be string, int */
+    size_t child; /* child's offset */
 };
 
 /***
  * internal node block
  ***/
+template<class key_t>
 struct internal_node_t {
-    typedef index_t * child_t;
+    typedef index_t<key_t> * child_t;
 
-    off_t parent; /* parent node offset */
-    off_t next;
-    off_t prev;
+    size_t parent; /* parent node offset */
+    size_t next;
+    size_t prev;
     size_t n; /* how many children */
     index_t children[BP_ORDER];
 };
 
+
+// the address of data (not directly store data)
+typedef size_t value_t;
+
+
 /* the final record of value */
+template<class ket_t>
 struct record_t {
     key_t key;
     value_t value;
 };
 
 /* leaf node block */
+template<class ket_t>
 struct leaf_node_t {
-    typedef record_t *child_t;
+    typedef record_t<key_t> *child_t;
 
-    off_t parent; /* parent node offset */
-    off_t next;
-    off_t prev;
+    size_t parent; /* parent node offset */
+    size_t next;
+    size_t prev;
     size_t n;
-    record_t children[BP_ORDER];
+    record_t<key_t> children[BP_ORDER];
 };
 
 
 
 /* the encapulated B+ tree */
+template<class S_Type, class key_t, class value_t>
 class bplus_tree {
 public:
     bplus_tree(const char *path, bool force_empty = false);
@@ -280,6 +327,39 @@ public:
     }
 };
 
+template<class key_t>
+inline int keycmp(const key_t &a, const key_t &b) {
+    int x = strlen(a.k) - strlen(b.k);
+    return x == 0 ? strcmp(a.k, b.k) : x;
 }
 
+
+template<class key_t, class type>
+bool operator< (const key_t &l, const type &r) {
+    return keycmp(l, r.key) < 0;
+}
+template<class key_t, class type>
+bool operator< (const type &l, const key_t &r) {
+    return keycmp(l.key, r) < 0;
+}
+template<class key_t, class type>
+bool operator== (const key_t &l, const type &r) {
+    return keycmp(l, r.key) == 0;
+}
+template<class key_t, class type>
+bool operator== (const type &l, const key_t &r) {
+    return keycmp(l.key, r) == 0;
+}
+
+
+
+
+
+
+
+} /* namespace bpt */
+
 #endif /* end of BPT_H */
+
+
+

@@ -12,8 +12,9 @@ using std::upper_bound;
 namespace bpt {
 
 /* custom compare operator for STL algorithms */
-OPERATOR_KEYCMP(index_t)
-OPERATOR_KEYCMP(record_t)
+// OPERATOR_KEYCMP(index_t)
+// OPERATOR_KEYCMP(record_t)
+
 
 /* helper iterating function */
 template<class T>
@@ -26,7 +27,8 @@ inline typename T::child_t end(T &node) {
 }
 
 /* helper searching function */
-inline index_t *find(internal_node_t &node, const key_t &key) {
+template<class key_t>
+inline index_t<key_t> *find(internal_node_t<key_t> &node, const key_t &key) {
     if (key) {
         return upper_bound(begin(node), end(node) - 1, key);
     }
@@ -36,9 +38,11 @@ inline index_t *find(internal_node_t &node, const key_t &key) {
     }
     return begin(node);
 }
-inline record_t *find(leaf_node_t &node, const key_t &key) {
+template<class key_t>
+inline record_t<key_t> *find(leaf_node_t<key_t> &node, const key_t &key) {
     return lower_bound(begin(node), end(node), key);
 }
+
 
 bplus_tree::bplus_tree(const char *p, bool force_empty)
     : fp(NULL), fp_level(0)
