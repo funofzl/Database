@@ -114,7 +114,7 @@ struct index_t {
  * internal node block
  ***/
 template<class key_t>
-struct internal_node_t<key_t> {
+struct internal_node_t {
     typedef index_t<key_t> * child_t;
 
     size_t  parent; /* parent node offset */
@@ -138,7 +138,7 @@ class record_t {
 
 /* leaf node block */
 template<class key_t>
-struct leaf_node_t<key_t> {
+struct leaf_node_t {
     typedef record_t<key_t> *child_t;
 
     size_t  parent; /* parent node offset */
@@ -364,4 +364,4 @@ bool operator== (const type &l, const key_t &r) {
 #endif /* end of BPT_H */
 
 
-
+;

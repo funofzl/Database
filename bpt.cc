@@ -21,6 +21,7 @@ template<class T>
 inline typename T::child_t begin(T &node) {
     return node.children; 
 }
+
 template<class T>
 inline typename T::child_t end(T &node) {
     return node.children + node.n;
@@ -38,6 +39,7 @@ inline index_t<key_t> *find(internal_node_t<key_t> &node, const key_t &key) {
     }
     return begin(node);
 }
+
 template<class key_t>
 inline record_t<key_t> *find(leaf_node_t<key_t> &node, const key_t &key) {
     return lower_bound(begin(node), end(node), key);
@@ -712,4 +714,5 @@ void bplus_tree<key_t>::init_from_empty()
     unmap(&leaf, root.children[0].child);
 }
 
+};
 }
