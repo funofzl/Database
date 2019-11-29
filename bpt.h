@@ -114,14 +114,14 @@ struct index_t {
  * internal node block
  ***/
 template<class key_t>
-struct internal_node_t<key_t> {
+struct internal_node_t {
     typedef index_t<key_t> * child_t;
 
     size_t  parent; /* parent node offset */
     size_t  next;
     size_t  prev;
     size_t  n; /* how many children */
-    index_t children[BP_ORDER];
+    index_t<key_t> children[BP_ORDER];
 };
 
 
@@ -138,7 +138,7 @@ class record_t {
 
 /* leaf node block */
 template<class key_t>
-struct leaf_node_t<key_t> {
+struct leaf_node_t {
     typedef record_t<key_t> *child_t;
 
     size_t  parent; /* parent node offset */
@@ -207,7 +207,7 @@ public:
     /* merge right leaf to left leaf */
     void merge_leafs(leaf_node_t<key_t> *left, leaf_node_t<key_t> *right);
 
-    void merge_keys(index_t *where, internal_node_t<key_t> &left,
+    void merge_keys(index_t<key_t> *where, internal_node_t<key_t> &left,
                     internal_node_t<key_t> &right, bool change_where_key = false);
 
     /* insert into leaf without split */
@@ -221,7 +221,7 @@ public:
                                       size_t value);
 
     /* change children's parent */
-    void reset_index_children_parent(index_t *begin, index_t *end,
+    void reset_index_children_parent(index_t<key_t> *begin, index_t<key_t> *end,
                                      size_t parent);
 
     template<class T>
@@ -364,4 +364,4 @@ bool operator== (const type &l, const key_t &r) {
 #endif /* end of BPT_H */
 
 
-
+;
