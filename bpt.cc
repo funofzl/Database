@@ -43,8 +43,8 @@ inline record_t<key_t> *find(leaf_node_t<key_t> &node, const key_t &key) {
     return lower_bound(begin(node), end(node), key);
 }
 
-
-bplus_tree::bplus_tree(const char *p, bool force_empty)
+template<class key_t>
+bplus_tree<mykey_t>::bplus_tree(const char *p, bool force_empty)
     : fp(NULL), fp_level(0)
 {
     bzero(path, sizeof(path));
@@ -64,7 +64,8 @@ bplus_tree::bplus_tree(const char *p, bool force_empty)
     }
 }
 
-int bplus_tree::search(const key_t& key, value_t *value) const
+template<typename key_tp>
+int bplus_tree::search(const key_tp& key, value_t *value) const
 {
     leaf_node_t leaf;
     map(&leaf, search_leaf(key));
@@ -658,14 +659,22 @@ void bplus_tree::node_remove(T *prev, T *node)
     unmap(&meta, OFFSET_META);
 }
 
-void bplus_tree::init_from_empty()
+template<class key_t>
+void bplus_tree<key_t>::init_from_empty()
 {
     // init default meta
-    bzero(&meta, sizeof(meta_t));
+    bzero(&meta, sizeof(key_meta_header));
     meta.key_size = sizeof(key_t);
     meta.height = 1;
     meta.page_count = 1;
+    meta.internal_node_num = 0;
+    meta.leaf_node_num = 0;
     meta.slot = OFFSET_BLOCK;
+    meta.leaf_offset = 0;
+    meta.un_count = 0;
+    meta.max_size = 0;
+    meta.unsorted = 0;       
+    meta.max_unsorted = 0;   
 
     // init root node
     internal_node_t root;
