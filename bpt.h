@@ -130,14 +130,14 @@ typedef size_t value_t;
 
 
 /* the final record of value */
-template<class ket_t>
+template<class key_t>
 class record_t {
-    key_t key;
+	key_t key;
     value_t value;
 };
 
 /* leaf node block */
-template<class ket_t>
+template<class key_t>
 struct leaf_node_t {
     typedef record_t<key_t> *child_t;
 
@@ -181,28 +181,28 @@ public:
     void init_from_empty();
 
     /* find index */
-    off_t search_index(const key_t &key) const;
+    size_tsearch_index(const key_t &key) const;
 
     /* find leaf */
-    off_t search_leaf(off_t index, const key_t &key) const;
-    off_t search_leaf(const key_t &key) const
+    size_tsearch_leaf(size_tindex, const key_t &key) const;
+    size_tsearch_leaf(const key_t &key) const
     {
         return search_leaf(search_index(key), key);
     }
 
     /* remove internal node */
-    void remove_from_index(off_t offset, internal_node_t &node,
+    void remove_from_index(size_toffset, internal_node_t &node,
                            const key_t &key);
 
     /* borrow one key from other internal node */
     bool borrow_key(bool from_right, internal_node_t &borrower,
-                    off_t offset);
+                    size_toffset);
 
     /* borrow one record from other leaf */
     bool borrow_key(bool from_right, leaf_node_t &borrower);
 
     /* change one's parent key to another key */
-    void change_parent_child(off_t parent, const key_t &o, const key_t &n);
+    void change_parent_child(size_tparent, const key_t &o, const key_t &n);
 
     /* merge right leaf to left leaf */
     void merge_leafs(leaf_node_t *left, leaf_node_t *right);
@@ -215,17 +215,17 @@ public:
                                 const key_t &key, const value_t &value);
 
     /* add key to the internal node */
-    void insert_key_to_index(off_t offset, const key_t &key,
-                             off_t value, off_t after);
+    void insert_key_to_index(size_toffset, const key_t &key,
+                             size_tvalue, size_tafter);
     void insert_key_to_index_no_split(internal_node_t &node, const key_t &key,
-                                      off_t value);
+                                      size_tvalue);
 
     /* change children's parent */
     void reset_index_children_parent(index_t *begin, index_t *end,
-                                     off_t parent);
+                                     size_tparent);
 
     template<class T>
-    void node_create(off_t offset, T *node, T *next);
+    void node_create(size_toffset, T *node, T *next);
 
     template<class T>
     void node_remove(T *prev, T *node);
@@ -251,39 +251,39 @@ public:
     }
 
     /* alloc from disk */
-    off_t alloc(size_t size)
+    size_talloc(size_t size)
     {
-        off_t slot = meta.slot;
+        size_tslot = meta.slot;
         meta.slot += size;
         return slot;
     }
 
-    off_t alloc(leaf_node_t *leaf)
+    size_talloc(leaf_node_t *leaf)
     {
         leaf->n = 0;
         meta.leaf_node_num++;
         return alloc(sizeof(leaf_node_t));
     }
 
-    off_t alloc(internal_node_t *node)
+    size_talloc(internal_node_t *node)
     {
         node->n = 1;
         meta.internal_node_num++;
         return alloc(sizeof(internal_node_t));
     }
 
-    void unalloc(leaf_node_t *leaf, off_t offset)
+    void unalloc(leaf_node_t *leaf, size_toffset)
     {
         --meta.leaf_node_num;
     }
 
-    void unalloc(internal_node_t *node, off_t offset)
+    void unalloc(internal_node_t *node, size_toffset)
     {
         --meta.internal_node_num;
     }
 
     /* read block from disk */
-    int map(void *block, off_t offset, size_t size) const
+    int map(void *block, size_toffset, size_t size) const
     {
         open_file();
         fseek(fp, offset, SEEK_SET);
@@ -294,13 +294,13 @@ public:
     }
 
     template<class T>
-    int map(T *block, off_t offset) const
+    int map(T *block, size_toffset) const
     {
         return map(block, offset, sizeof(T));
     }
 
     /* write block to disk */
-    int unmap(void *block, off_t offset, size_t size) const
+    int unmap(void *block, size_toffset, size_t size) const
     {
         open_file();
         fseek(fp, offset, SEEK_SET);
@@ -311,7 +311,7 @@ public:
     }
 
     template<class T>
-    int unmap(T *block, off_t offset) const
+    int unmap(T *block, size_toffset) const
     {
         return unmap(block, offset, sizeof(T));
     }
