@@ -17,7 +17,7 @@ namespace bpt {
 /* offsets */
 #define OFFSET_META 0
 #define OFFSET_BLOCK OFFSET_META + sizeof(key_meta_t)
-#define SIZE_NO_CHILDREN sizeof(leaf_node_t) - BP_ORDER * sizeof(record_t)
+#define SIZE_NO_CHILDREN sizeof(leaf_node_t<key_t>) - BP_ORDER * sizeof(record_t)
 
 #define BP_ORDER 20
 
@@ -33,25 +33,25 @@ struct key_meta_t{
     int key_size;   /* size of per key */
     int internal_node_num; /* how many internal nodes */
     int leaf_node_num;     /* how many leafs */
-    size_t root_offset; /* where is the root of internal nodes */
-    size_t leaf_offset; /* where is the first leaf */
+    size_t  root_offset; /* where is the root of internal nodes */
+    size_t  leaf_offset; /* where is the first leaf */
     unsigned int page_count; /* how many pages */
     unsigned int un_count;  /* unsorted_map link area count  */
     unsigned int max_size;  /* max_unsorted size */
-    size_t unsorted;    /* empty key area lnk (when insert few data it will will be used) */ 
-    size_t max_unsorted;    /* max size unsorted */
+    size_t  unsorted;    /* empty key area lnk (when insert few data it will will be used) */ 
+    size_t  max_unsorted;    /* max size unsorted */
 
-    size_t slot;        /* where to store new block */
+    size_t  slot;        /* where to store new block */
 };
 using key_meta_header = struct key_meta_t;
 
 /* standord size(40) Bytes */
 struct data_meta_t{
     unsigned short data_count;  /* data count */
-    size_t begin_offset; /* where is the root of internal nodes */
-    size_t slot;        /* where to store new block */
-    size_t unsorted;    /* empty key area lnk (when insert few data it will will be used) */ 
-    size_t max_unsorted;    /* max size unsorted */
+    size_t  begin_offset; /* where is the root of internal nodes */
+    size_t  slot;        /* where to store new block */
+    size_t  unsorted;    /* empty key area lnk (when insert few data it will will be used) */ 
+    size_t  max_unsorted;    /* max size unsorted */
     unsigned int un_count;  /* unsorted_map link area count  */
     unsigned int max_size;  /* max_unsorted size */
 };
@@ -79,7 +79,7 @@ struct row_t{
     /* char unused */
     unsigned short null_map_size; /* field */
     short null_map; // a part of null_map if sizeof(null_map) > 16 there will be new null_map after row_t but before data
-    size_t next;  /* --row_id-- like pointer point to next raw  (64 = 50 + 12 ) 
+    size_t  next;  /* --row_id-- like pointer point to next raw  (64 = 50 + 12 ) 
                     50 stand for page_id and 12 stand for the address of a row in per page */  
     /* null_map */
     /* data */
@@ -107,26 +107,26 @@ using row_dic = row_direc_t;
 template<class key_t>
 struct index_t {
     key_t key;      /* according to the condition, it will be string, int */
-    size_t child; /* child's offset */
+    size_t  child; /* child's offset */
 };
 
 /***
  * internal node block
  ***/
 template<class key_t>
-struct internal_node_t {
+struct internal_node_t<key_t> {
     typedef index_t<key_t> * child_t;
 
-    size_t parent; /* parent node offset */
-    size_t next;
-    size_t prev;
-    size_t n; /* how many children */
+    size_t  parent; /* parent node offset */
+    size_t  next;
+    size_t  prev;
+    size_t  n; /* how many children */
     index_t children[BP_ORDER];
 };
 
 
 // the address of data (not directly store data)
-typedef size_t value_t;
+typedef size_t  value_t;
 
 
 /* the final record of value */
@@ -138,13 +138,13 @@ class record_t {
 
 /* leaf node block */
 template<class key_t>
-struct leaf_node_t {
+struct leaf_node_t<key_t> {
     typedef record_t<key_t> *child_t;
 
-    size_t parent; /* parent node offset */
-    size_t next;
-    size_t prev;
-    size_t n;
+    size_t  parent; /* parent node offset */
+    size_t  next;
+    size_t  prev;
+    size_t  n;
     record_t<key_t> children[BP_ORDER];
 };
 
@@ -159,7 +159,7 @@ public:
     /* abstract operations */
     int search(const key_t & key, value_t *value) const;
     int search_range(key_t *left, const key_t &right,
-                     value_t *values, size_t max, bool *next = NULL) const;
+                     value_t *values, size_t  max, bool *next = NULL) const;
     int remove(const key_t& key);
     int insert(const key_t& key, value_t value);
     int update(const key_t& key, value_t value);
@@ -181,51 +181,51 @@ public:
     void init_from_empty();
 
     /* find index */
-    size_tsearch_index(const key_t &key) const;
+    size_t search_index(const key_t &key) const;
 
     /* find leaf */
-    size_tsearch_leaf(size_tindex, const key_t &key) const;
-    size_tsearch_leaf(const key_t &key) const
+    size_t search_leaf(size_t index, const key_t &key) const;
+    size_t search_leaf(const key_t &key) const
     {
         return search_leaf(search_index(key), key);
     }
 
     /* remove internal node */
-    void remove_from_index(size_toffset, internal_node_t &node,
+    void remove_from_index(size_t offset, internal_node_t<key_t> &node,
                            const key_t &key);
 
     /* borrow one key from other internal node */
-    bool borrow_key(bool from_right, internal_node_t &borrower,
-                    size_toffset);
+    bool borrow_key(bool from_right, internal_node_t<key_t> &borrower,
+                    size_t offset);
 
     /* borrow one record from other leaf */
-    bool borrow_key(bool from_right, leaf_node_t &borrower);
+    bool borrow_key(bool from_right, leaf_node_t<key_t> &borrower);
 
     /* change one's parent key to another key */
-    void change_parent_child(size_tparent, const key_t &o, const key_t &n);
+    void change_parent_child(size_t parent, const key_t &o, const key_t &n);
 
     /* merge right leaf to left leaf */
-    void merge_leafs(leaf_node_t *left, leaf_node_t *right);
+    void merge_leafs(leaf_node_t<key_t> *left, leaf_node_t<key_t> *right);
 
-    void merge_keys(index_t *where, internal_node_t &left,
-                    internal_node_t &right, bool change_where_key = false);
+    void merge_keys(index_t *where, internal_node_t<key_t> &left,
+                    internal_node_t<key_t> &right, bool change_where_key = false);
 
     /* insert into leaf without split */
-    void insert_record_no_split(leaf_node_t *leaf,
+    void insert_record_no_split(leaf_node_t<key_t> *leaf,
                                 const key_t &key, const value_t &value);
 
     /* add key to the internal node */
-    void insert_key_to_index(size_toffset, const key_t &key,
-                             size_tvalue, size_tafter);
-    void insert_key_to_index_no_split(internal_node_t &node, const key_t &key,
-                                      size_tvalue);
+    void insert_key_to_index(size_t offset, const key_t &key,
+                             size_t value, size_t after);
+    void insert_key_to_index_no_split(internal_node_t<key_t> &node, const key_t &key,
+                                      size_t value);
 
     /* change children's parent */
     void reset_index_children_parent(index_t *begin, index_t *end,
-                                     size_tparent);
+                                     size_t parent);
 
     template<class T>
-    void node_create(size_toffset, T *node, T *next);
+    void node_create(size_t offset, T *node, T *next);
 
     template<class T>
     void node_remove(T *prev, T *node);
@@ -251,56 +251,56 @@ public:
     }
 
     /* alloc from disk */
-    size_talloc(size_t size)
+    size_t alloc(size_t  size)
     {
-        size_tslot = meta.slot;
+        size_t slot = meta.slot;
         meta.slot += size;
         return slot;
     }
 
-    size_talloc(leaf_node_t *leaf)
+    size_t alloc(leaf_node_t<key_t> *leaf)
     {
         leaf->n = 0;
         meta.leaf_node_num++;
-        return alloc(sizeof(leaf_node_t));
+        return alloc(sizeof(leaf_node_t<key_t>));
     }
 
-    size_talloc(internal_node_t *node)
+    size_t alloc(internal_node_t<key_t> *node)
     {
         node->n = 1;
         meta.internal_node_num++;
-        return alloc(sizeof(internal_node_t));
+        return alloc(sizeof(internal_node_t<key_t>));
     }
 
-    void unalloc(leaf_node_t *leaf, size_toffset)
+    void unalloc(leaf_node_t<key_t> *leaf, size_t offset)
     {
         --meta.leaf_node_num;
     }
 
-    void unalloc(internal_node_t *node, size_toffset)
+    void unalloc(internal_node_t<key_t> *node, size_t offset)
     {
         --meta.internal_node_num;
     }
 
     /* read block from disk */
-    int map(void *block, size_toffset, size_t size) const
+    int map(void *block, size_t offset, size_t  size) const
     {
         open_file();
         fseek(fp, offset, SEEK_SET);
-        size_t rd = fread(block, size, 1, fp);
+        size_t  rd = fread(block, size, 1, fp);
         close_file();
 
         return rd - 1;
     }
 
     template<class T>
-    int map(T *block, size_toffset) const
+    int map(T *block, size_t offset) const
     {
         return map(block, offset, sizeof(T));
     }
 
     /* write block to disk */
-    int unmap(void *block, size_toffset, size_t size) const
+    int unmap(void *block, size_t offset, size_t  size) const
     {
         open_file();
         fseek(fp, offset, SEEK_SET);
@@ -311,7 +311,7 @@ public:
     }
 
     template<class T>
-    int unmap(T *block, size_toffset) const
+    int unmap(T *block, size_t offset) const
     {
         return unmap(block, offset, sizeof(T));
     }
