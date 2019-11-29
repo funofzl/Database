@@ -149,7 +149,7 @@ int bplus_tree<key_t>::remove(const key_t& key)
     map(&parent, parent_off);
 
     // find current node
-    index_t *where = find(parent, key);
+    index_t<key_t> *where = find(parent, key);
     size_t offset = where->child;
     map(&leaf, offset);
 
@@ -298,7 +298,7 @@ void bplus_tree<key_t>::remove_from_index(size_t offset, internal_node_t<key_t> 
 
     // remove key
     key_t index_key = begin(node)->key;
-    index_t *to_delete = find(node, key);
+    index_t<key_t> *to_delete = find(node, key);
     if (to_delete != end(node)) {
         (to_delete + 1)->child = to_delete->child;
         std::copy(to_delete + 1, end(node), to_delete);
@@ -341,7 +341,7 @@ void bplus_tree<key_t>::remove_from_index(size_t offset, internal_node_t<key_t> 
                 map(&prev, node.prev);
 
                 // merge
-                index_t *where = find(parent, begin(prev)->key);
+                index_t<key_t> *where = find(parent, begin(prev)->key);
                 reset_index_children_parent(begin(node), end(node), node.prev);
                 merge_keys(where, prev, node, true);
                 unmap(&prev, node.prev);
@@ -352,7 +352,7 @@ void bplus_tree<key_t>::remove_from_index(size_t offset, internal_node_t<key_t> 
                 map(&next, node.next);
 
                 // merge
-                index_t *where = find(parent, index_key);
+                index_t<key_t> *where = find(parent, index_key);
                 reset_index_children_parent(begin(next), end(next), offset);
                 merge_keys(where, node, next);
                 unmap(&node, offset);
@@ -468,7 +468,7 @@ void bplus_tree<key_t>::change_parent_child(size_t parent, const key_t &o,
     internal_node_t<key_t> node;
     map(&node, parent);
 
-    index_t *w = find(node, o);
+    index_t<key_t> *w = find(node, o);
     assert(w != node.children + node.n); 
 
     w->key = n;
@@ -589,7 +589,7 @@ template<class key_t>
 void bplus_tree<key_t>::insert_key_to_index_no_split(internal_node_t<key_t> &node,
                                               const key_t &key, size_t value)
 {
-    index_t *where = upper_bound(begin(node), end(node) - 1, key);
+    index_t<key_t> *where = upper_bound(begin(node), end(node) - 1, key);
 
     // move later index forward
     std::copy_backward(where, end(node), end(node) + 1);
@@ -628,7 +628,7 @@ size_t bplus_tree<key_t>::search_index(const key_t &key) const
         internal_node_t<key_t> node;
         map(&node, org);
 
-        index_t *i = upper_bound(begin(node), end(node) - 1, key);
+        index_t<key_t> *i = upper_bound(begin(node), end(node) - 1, key);
         org = i->child;
         --height;
     }
@@ -642,7 +642,7 @@ size_t bplus_tree<key_t>::search_leaf(size_t index, const key_t &key) const
     internal_node_t<key_t> node;
     map(&node, index);
 
-    index_t *i = upper_bound(begin(node), end(node) - 1, key);
+    index_t<key_t> *i = upper_bound(begin(node), end(node) - 1, key);
     return i->child;
 }
 
