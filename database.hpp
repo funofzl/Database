@@ -60,17 +60,22 @@ struct Task
     size_t row_object;
 };
 
-/* sizeof(4 + 4 + 64 + 640 + 400 + 2000) = 712 + 800 = 3112 (Bytes) */
+/* sizeof(8 + 40 + 1240 +2800) = 4088 (Bytes) */
 struct table_meta_t{
+    //8
     int fields_count = 0;   
     int index_count = 0;
+    // 40
     char pri_name[20];  // primary key name
     char pri_field_name[20];
-    char indexs[MAX_INDEX_C][20];
-    char idx_field_name[MAX_INDEX_C][MAX_FIELD_C];
-    int indexs_len[MAX_INDEX_C];
-    int fields_type[MAX_FIELD_C];
-    char fields_name[MAX_FIELD_C][20];
+    int pri_max_len;
+    //1240
+    char indexs[MAX_INDEX_C][20];       // index key name
+    char idx_field_name[MAX_INDEX_C][MAX_FIELD_C];  // the fields for per index contrains
+    int indexs_max_len[MAX_INDEX_C];        //  max length of index key value
+    //2800
+    int fields_type[MAX_FIELD_C];       // fields type
+    char fields_name[MAX_FIELD_C][20];  // fields name
     int fields_len[MAX_FIELD_C];    // Bytes count
 };
 

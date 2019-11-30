@@ -240,7 +240,7 @@ void Database::CreateFile(string table_name, map<string, string> fields_result) 
         }else if(field_type == 6){ // index key
             memcpy(table_meta.indexs[table_meta.index_count], 
                             field_name.c_str(), field_name.size());
-            table_meta.indexs_len[table_meta.index_count] = field_len;
+            table_meta.indexs_max_len[table_meta.index_count] = field_len;
             table_meta.index_count += 1;
         }else{  // fields
             table_meta.fields_type[table_meta.fields_count] = field_type;
@@ -250,17 +250,59 @@ void Database::CreateFile(string table_name, map<string, string> fields_result) 
             table_meta.fields_count += 1;
         }
     }
+    // set the max_len of primary key
     int i = 0;
+    while(i < table_meta.fields_count){
+        if(strcmp(table_meta.pri_field_name, table_meta.fields_name[i]) == 0){
+                table_meta.pri_max_len = table_meta.fields_len[i];
+                int tp = table_meta.
+                break;
+        }
+        i++;
+    }
+    
+
     key_meta_t key_meta;
+    // Set the primary key file meta_header
+    bzero(&key_meta, sizeof(key_meta_header));
+    key_meta.key_size = table_meta.pri_max_len;
+    key_meta.height = 1;
+    key_meta.internal_node_num = 1;
+    key_meta.leaf_node_num = 1;
+    // slot theposition which block begin 
+    key_meta.slot = OFFSET_BLOCK;
+    
+    key_meta.page_count = 4;
+    key_meta.un_count = 0;
+    key_meta.max_size = 0;
+    key_meta.unsorted = 0;
+    key_meta.max_unsorted = 0;
+
+    // init root node
+    internal_node_t<key_t> root;
+    root.next = root.prev = root.parent = 0;
+    key_meta.root_offset = key_meta.slot;
+    key_meta.slot += sizeof(root);
+
+    // init empty leaf
+    internal_node_t<key_t> leaf;
+    leaf.next = leaf.prev = 0;
+    leaf.parent = key_meta.root_offset;
+    key_meta.leaf_offset = root.children[0].child = key_meta.slot;
+    key_meta.slot += sizeof(leaf);
+
+    // Set the indedx key file meta_header
+    i = 0; 
     for(;i<table_meta.index_count;i++){
         bzero(&key_meta, sizeof(key_meta_header));
-        key_meta.key_size = sizeof(key_t);
+        key_meta.key_size = table_meta.pri_max_len;
         key_meta.height = 1;
-        key_meta.page_count = 1;
-        key_meta.internal_node_num = 0;
-        key_meta.leaf_node_num = 0;
+        key_meta.internal_node_num = 1;
+        key_meta.leaf_node_num = 1;
+        // slot theposition which block begin 
         key_meta.slot = OFFSET_BLOCK;
-        key_meta.leaf_offset = 0;
+        
+        key_meta.page_count = 4;
         key_meta.un_count = 0;
         key_meta.max_size = 0;
         key_meta.unsorted = 0;

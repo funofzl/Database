@@ -16,12 +16,12 @@ namespace bpt {
 
 /* offsets */
 #define OFFSET_META 0
-#define OFFSET_BLOCK OFFSET_META + sizeof(key_meta_t)
+#define OFFSET_BLOCK ((OFFSET_META + sizeof(key_meta_t)) / 4096 + 1) * 4096
 #define SIZE_NO_CHILDREN sizeof(leaf_node_t<key_t>) - BP_ORDER * sizeof(record_t)
 
 #define BP_ORDER 20
 
-enum page_type{PRIMARY_KEY, INDEX_KEY, DATA};
+enum record_type{PRIMARY_KEY, INDEX_KEY, DATA};
 
 /* meta information of B+ tree */
 
@@ -61,7 +61,7 @@ using data_meta_header = data_meta_t;
 /* page header size(16) Bytes*/
 struct page_t{
     char page_id;   /* page_id */
-    short record_type;  /* 记录的数据类型(data  (index)key) */
+    char record_type;  /* 记录的数据类型(data  (index)key)   from enum record_type */ 
 
     short free_space;   /* free space */
     short row_space;
@@ -126,7 +126,7 @@ struct internal_node_t {
 
 
 // the address of data (not directly store data)
-typedef size_t  value_t;
+// typedef size_t  value_t;
 
 
 /* the final record of value */
@@ -156,11 +156,12 @@ struct leaf_node_t {
 
 
 /* the encapulated B+ tree */
-template<class key_t>
+template<class key_t, class value_t>
 class bplus_tree {
 public:
     bplus_tree(const char *path, bool force_empty = false);
 
+    
     /* abstract operations */
     int search(const key_t & key, value_t *value) const;
     int search_range(key_t *left, const key_t &right,
@@ -183,7 +184,7 @@ public:
 
     /* init empty tree */
     // void init_from_empty();
-    void init_from_empty();
+    static void init_from_empty();
 
     /* find index */
     size_t search_index(const key_t &key) const;
