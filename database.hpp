@@ -64,11 +64,14 @@ struct Task
 struct table_meta_t{
     int fields_count = 0;   
     int index_count = 0;
-    char pri_name[64];  // primary key name
-    char pri_field_name[64];
-    char indexs[MAX_INDEX_C][64];
+    char pri_name[20];  // primary key name
+    char pri_field_name[20];
+    char indexs[MAX_INDEX_C][20];
+    char idx_field_name[MAX_INDEX_C][MAX_FIELD_C];
+    int indexs_len[MAX_INDEX_C];
     int fields_type[MAX_FIELD_C];
     char fields_name[MAX_FIELD_C][20];
+    int fields_len[MAX_FIELD_C];    // Bytes count
 };
 
 class Database
@@ -85,7 +88,7 @@ public:
     void Select();
     void Error(string err_str);
 protected:
-    vector<bpt::bplus_tree<key_t>> Trees;
+    // vector<bpt::bplus_tree<key_t>> Trees;
     vector<string> Cache_table;         // Store tables which this page store
     vector<bpt::page_t> Cache_pages;    // Store cache pages
     vector<Task> Tasks;                 // Store current waiting tasks 

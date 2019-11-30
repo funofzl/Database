@@ -53,7 +53,7 @@
         if(bracket_left < 0){   
             temp.clear();
             trim(temp[1]);
-            fields_result[temp[0]] = temp[1];
+            fields_result[temp[0]] = temp[1] + " " + to_string(11);
             continue;
         }
         // there are some brackets
@@ -81,14 +81,18 @@
             vector<string> ts;
             split(t, ',', ts);
             string type_all;
+            int max_len_of_enum = 0;
             j = 0;
             while(j < ts.size()){
                 trim(ts[j]);
-                ts[j] = ts[j].substr(1, ts[j].size()-1);
+                ts[j] = ts[j].substr(1, ts[j].size()-1);    // discard the ""
+                if(ts[j].size() > max_len_of_enum){
+                    max_len_of_enum = ts[j].size();
+                }
                 type_all += (" " + ts[j]);
                 j++;
             } 
-            fields_result[temp[0]] = "enum" + type_all;
+            fields_result[temp[0]] = "enum " + to_string(max_len_of_enum) + " " + to_string(ts.size()) + type_all;
             continue;
         }
         // primary
@@ -211,17 +215,18 @@ void Database::CreateFile(string table_name, map<string, string> fields_result) 
     map<string, string>::iterator iter = fields_result.begin();
     stringstream ss;
     string field_name;
-    string field_t;
+    string field_type_s;
     string pri_field_name;
     int field_type;
-    int ws_pos;
+    int field_len;
     while (iter != fields_result.end())
     {
         ss.clear();
         ss<<iter->second;
         field_name = iter->first;
-        ss>>field_t;
-        field_type = parse_type(field_t);
+        ss>>field_type_s;
+        field_type = parse_type(field_type_s);
+        ss>>field_len;
 
         if(field_type == 7){
             Error("FIELD_TYPE Error");
@@ -235,11 +240,13 @@ void Database::CreateFile(string table_name, map<string, string> fields_result) 
         }else if(field_type == 6){ // index key
             memcpy(table_meta.indexs[table_meta.index_count], 
                             field_name.c_str(), field_name.size());
+            table_meta.indexs_len[table_meta.index_count] = field_len;
             table_meta.index_count += 1;
         }else{  // fields
             table_meta.fields_type[table_meta.fields_count] = field_type;
             memcpy(table_meta.fields_name[table_meta.fields_count], 
                             field_name.c_str(), field_name.size());
+            table_meta.fields_len[table_meta.fields_count] = field_len;
             table_meta.fields_count += 1;
         }
     }
