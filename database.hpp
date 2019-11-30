@@ -13,14 +13,14 @@ using std::map;
 // Cache object count (which one is two pages)
 const int PAGE_N = 4;
 
-// There are PAGE_N*2 cache pages;
-const int PAGE_C = PAGE_N * 2;
+// There are PAGE_N*4 cache pages;
+const int PAGE_C = PAGE_N * 4;   
 
 // There are only TASK_C in running.
 const int TASK_C = PAGE_N;
 
 // max page cache when there are not so many tasks
-const int TASK_PAGE_C = 4;
+const int PAGE_PER_TASK = 4 * 2;
 
 enum LOCK_TYPE{NONE, READ, WRITE};
 // 操作表的键类型
