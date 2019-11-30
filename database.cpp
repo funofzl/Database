@@ -144,6 +144,8 @@ void Create(map<string, string>& fields_result)
     // db file name
     // fields
     // keys
+    
+
 }
 
 // 删表
@@ -177,16 +179,10 @@ void Database::Select()
 
 
 
-struct table_file {
-	char table_name[20];
-	int field_count;
-	map<string, string> fields;
-};
-using Table_Meta = struct table_file;
 
 void Database::CreateFile(string table_name, map<string, string> fields_result) {
-	Table_Meta t_m;
-	fstream tb_f("table_name");
+    // write the tablename to table_name.txt(whch contains all table names)
+	fstream tb_f("table_name.txt");
 	char buffer[20];
 	while (!tb_f.eof()) {
 		tb_f.getline(buffer, 20);
@@ -199,14 +195,96 @@ void Database::CreateFile(string table_name, map<string, string> fields_result) 
 		Error("Table name length too long!");
 	}
 	tb_f << table_name << endl;
+    // write the table_meta to "table_name".txt
+    tb_f.close();
+    tb_f.open(table_name+".txt");
 
 
-	t_m.field_count = fields_result.size();
-	strcpy(t_m.table_name, table_name.c_str());
-	t_m.fields = fields_result;
+    // create .db(data file) .key(primaey index file) .idx(index key file)
 	ifstream d_f(table_name + ".db");
 	ifstream k_f(table_name + ".key");
-	ifstream d_f(table_name + ".idx");
-	
+	table_meta_t table_meta;
+    key_meta_header priKey_meta;
+    data_meta_header data_meta;
+    bool have_priKey = false;
+    // table_mate
+    map<string, string>::iterator iter = fields_result.begin();
+    stringstream ss;
+    string field_name;
+    string field_t;
+    string pri_field_name;
+    int field_type;
+    int ws_pos;
+    while (iter != fields_result.end())
+    {
+        ss.clear();
+        ss<<iter->second;
+        field_name = iter->first;
+        ss>>field_t;
+        field_type = parse_type(field_t);
 
+        if(field_type == 7){
+            Error("FIELD_TYPE Error");
+            exit(0);
+        }else if(field_type == 5){  // primaey key
+            have_priKey = true;
+            memcpy(table_meta.pri_name, field_name.c_str(), field_name.size());
+            ss>>pri_field_name;
+            memcpy(table_meta.pri_field_name, pri_field_name.c_str(), 
+                                            pri_field_name.size());
+        }else if(field_type == 6){ // index key
+            memcpy(table_meta.indexs[table_meta.index_count], 
+                            field_name.c_str(), field_name.size());
+            table_meta.index_count += 1;
+        }else{  // fields
+            table_meta.fields_type[table_meta.fields_count] = field_type;
+            memcpy(table_meta.fields_name[table_meta.fields_count], 
+                            field_name.c_str(), field_name.size());
+            table_meta.fields_count += 1;
+        }
+    }
+    int i = 0;
+    key_meta_t key_meta;
+    for(;i<table_meta.index_count;i++){
+        bzero(&key_meta, sizeof(key_meta_header));
+        key_meta.key_size = sizeof(key_t);
+        key_meta.height = 1;
+        key_meta.page_count = 1;
+        key_meta.internal_node_num = 0;
+        key_meta.leaf_node_num = 0;
+        key_meta.slot = OFFSET_BLOCK;
+        key_meta.leaf_offset = 0;
+        key_meta.un_count = 0;
+        key_meta.max_size = 0;
+        key_meta.unsorted = 0;
+        key_meta.max_unsorted = 0;
+
+        // init root node
+        internal_node_t<key_t> root;
+        root.next = root.prev = root.parent = 0;
+        key_meta.root_offset = alloc(&root);
+
+        // init empty leaf
+        internal_node_t<key_t> leaf;
+        leaf.next = leaf.prev = 0;
+        leaf.parent = key_meta.root_offset;
+        key_meta.leaf_offset = root.children[0].child = alloc(&leaf);
+    }
 }
+
+// struct key_meta_t
+// {
+//     int height;              /* height of tree (exclude leafs) */
+//     int key_size;            /* size of per key */
+//     int internal_node_num;   /* how many internal nodes */
+//     int leaf_node_num;       /* how many leafs */
+//     size_t root_offset;      /* where is the root of internal nodes */
+//     size_t leaf_offset;      /* where is the first leaf */
+//     unsigned int page_count; /* how many pages */
+//     unsigned int un_count;   /* unsorted_map link area count  */
+//     unsigned int max_size;   /* max_unsorted size */
+//     size_t unsorted;         /* empty key area lnk (when insert few data it will will be used) */
+//     size_t max_unsorted;     /* max size unsorted */
+
+//     size_t slot; /* where to store new block */
+// };

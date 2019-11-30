@@ -28,24 +28,47 @@ enum INDEX_TYPE{NON_K, PRI_K, COM_K};
 
 enum OP{CREATE, DROP, SELECT, INSERT, UPDATE, DELETE};
 
-enum FIELD_TYPE{INT, CHAR, VARCHAR, ENUM, TEXT};
+enum FIELD_TYPE{INT, CHAR, VARCHAR, ENUM, TEXT, PRIMARY, INDEX, ERROR};
 
-void map_type(string real_type, int & type){
-    
+const int MAX_FIELD_C = 100;
+const int MAX_INDEX_C = 10;
+
+const map<string, int> Field_t{
+    {"int", 0}, {"char", 1}, {"varchar", 2}, {"enum", 3}, {"text", 4},
+    {"primary", 5}, {"index", 6}
+};
+
+// field string convert to FIELD_TYPE(int)
+int parse_type(const string &t)
+{   
+    map<string, int>::const_iterator iter;
+    iter = Field_t.find(t);
+    if(iter == Field_t.cend()){
+        cout<<"FIELD_TYPE Error. Unknown type"<<endl;
+        return FIELD_TYPE::ERROR;
+    }
+    return iter->second;
 }
 
+// Task struct (which will be executed)
 struct Task
 {
     int want_lock = NONE;
     int real_lock = NONE; 
     int index_type = PRI_K;
-    string table_obj;
-    string row_object;
+    char table_obj[50];
+    size_t row_object;
 };
 
-
-struct {
-
+/* sizeof(4 + 4 + 64 + 640 + 400 + 2000) = 712 + 800 = 3112 (Bytes) */
+struct table_meta_t{
+    int fields_count = 0;   
+    int index_count = 0;
+    char pri_name[64];  // primary key name
+    char pri_field_name[64];
+    char indexs[MAX_INDEX_C][64];
+    int fields_type[MAX_FIELD_C];
+    char fields_name[MAX_FIELD_C][20];
 };
 
 class Database
@@ -62,7 +85,7 @@ public:
     void Select();
     void Error(string err_str);
 protected:
-    vector<bpt::bplus_tree> Trees;
+    vector<bpt::bplus_tree<key_t>> Trees;
     vector<string> Cache_table;         // Store tables which this page store
     vector<bpt::page_t> Cache_pages;    // Store cache pages
     vector<Task> Tasks;                 // Store current waiting tasks 
@@ -96,4 +119,6 @@ void Database::QueryParse(int type, const vector<string> query)
         Create(fields_result);
     }
 }
+
+
 
