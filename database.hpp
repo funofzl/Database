@@ -50,6 +50,17 @@ int parse_type(const string &t)
     return iter->second;
 }
 
+string get_type_str(int tp){
+    map<string, int>::const_iterator iter = Field_t.cbegin();
+    while(iter != Field_t.cend()){
+        if(iter->second == tp){
+            return iter->first;
+        }
+    }
+    return "error";
+}
+
+
 // Task struct (which will be executed)
 struct Task
 {

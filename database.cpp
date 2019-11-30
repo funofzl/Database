@@ -251,11 +251,15 @@ void Database::CreateFile(string table_name, map<string, string> fields_result) 
         }
     }
     // set the max_len of primary key
+    typedef int key_type;
     int i = 0;
     while(i < table_meta.fields_count){
         if(strcmp(table_meta.pri_field_name, table_meta.fields_name[i]) == 0){
                 table_meta.pri_max_len = table_meta.fields_len[i];
-                int tp = table_meta.
+                string tp = get_type_str(table_meta.fields_type[i]);
+                if(tp == "int"){
+                    typedef int key_type;
+                }
                 break;
         }
         i++;
@@ -279,13 +283,13 @@ void Database::CreateFile(string table_name, map<string, string> fields_result) 
     key_meta.max_unsorted = 0;
 
     // init root node
-    internal_node_t<key_t> root;
+    internal_node_t<key_type> root;
     root.next = root.prev = root.parent = 0;
     key_meta.root_offset = key_meta.slot;
     key_meta.slot += sizeof(root);
 
     // init empty leaf
-    internal_node_t<key_t> leaf;
+    internal_node_t<key_type> leaf;
     leaf.next = leaf.prev = 0;
     leaf.parent = key_meta.root_offset;
     key_meta.leaf_offset = root.children[0].child = key_meta.slot;
@@ -309,12 +313,12 @@ void Database::CreateFile(string table_name, map<string, string> fields_result) 
         key_meta.max_unsorted = 0;
 
         // init root node
-        internal_node_t<key_t> root;
+        internal_node_t<key_type> root;
         root.next = root.prev = root.parent = 0;
         key_meta.root_offset = alloc(&root);
 
         // init empty leaf
-        internal_node_t<key_t> leaf;
+        internal_node_t<key_type> leaf;
         leaf.next = leaf.prev = 0;
         leaf.parent = key_meta.root_offset;
         key_meta.leaf_offset = root.children[0].child = alloc(&leaf);
