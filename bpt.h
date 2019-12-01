@@ -113,7 +113,7 @@ struct index_t {
 /***
  * internal node block
  ***/
-template<class key_t>
+template<class key_t, class value_t>
 struct internal_node_t {
     typedef index_t<key_t> * child_t;
 
@@ -130,22 +130,22 @@ struct internal_node_t {
 
 
 /* the final record of value */
-template<class key_t>
+template<class key_t, class value_t>
 class record_t {
 	key_t key;
     value_t value;
 };
 
 /* leaf node block */
-template<class key_t>
+template<class key_t, class value_t>
 struct leaf_node_t {
-    typedef record_t<key_t> *child_t;
+    typedef record_t<key_t, value_t> *child_t;
 
     size_t  parent; /* parent node offset */
     size_t  next;
     size_t  prev;
     size_t  n;
-    record_t<key_t> children[BP_ORDER];
+    record_t<key_t, value_t> children[BP_ORDER];
 };
 
 
@@ -153,11 +153,11 @@ struct leaf_node_t {
 
 
 
-
+class Tree(){};
 
 /* the encapulated B+ tree */
 template<class key_t, class value_t>
-class bplus_tree {
+class bplus_tree : public Tree{
 public:
     bplus_tree(const char *path, bool force_empty = false);
 
@@ -335,29 +335,29 @@ public:
     }
 };
 
-template<class key_t>
-inline int keycmp(const key_t &a, const key_t &b) {
-    int x = strlen(a.k) - strlen(b.k);
-    return x == 0 ? strcmp(a.k, b.k) : x;
-}
+// template<class key_t>
+// inline int keycmp(const key_t &a, const key_t &b) {
+//     int x = strlen(a.k) - strlen(b.k);
+//     return x == 0 ? strcmp(a.k, b.k) : x;
+// }
 
 
-template<class key_t, class type>
-bool operator< (const key_t &l, const type &r) {
-    return keycmp(l, r.key) < 0;
-}
-template<class key_t, class type>
-bool operator< (const type &l, const key_t &r) {
-    return keycmp(l.key, r) < 0;
-}
-template<class key_t, class type>
-bool operator== (const key_t &l, const type &r) {
-    return keycmp(l, r.key) == 0;
-}
-template<class key_t, class type>
-bool operator== (const type &l, const key_t &r) {
-    return keycmp(l.key, r) == 0;
-}
+// template<class key_t, class type>
+// bool operator< (const key_t &l, const type &r) {
+//     return keycmp(l, r.key) < 0;
+// }
+// template<class key_t, class type>
+// bool operator< (const type &l, const key_t &r) {
+//     return keycmp(l.key, r) < 0;
+// }
+// template<class key_t, class type>
+// bool operator== (const key_t &l, const type &r) {
+//     return keycmp(l, r.key) == 0;
+// }
+// template<class key_t, class type>
+// bool operator== (const type &l, const key_t &r) {
+//     return keycmp(l.key, r) == 0;
+// }
 
 
 

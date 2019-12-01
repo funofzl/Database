@@ -1,7 +1,7 @@
 #include "database.hpp"
 
 // create parse
- void Database::create_parse(const int & type, const vector<string>& query, map<string, string>& fields_result){
+ void Database::create_parse(const vector<string>& query, string& table_name, map<string, string>& fields_result){
     int i = 0;
     string qs;
     while(i < query.size()){
@@ -18,7 +18,7 @@
         Error("syntax error around tablename");
     }
     /* First substr the tablename */
-    string table_name = qs.substr(0, bracket_left);
+    table_name = qs.substr(0, bracket_left);
     qs = qs.substr(bracket_left, bracket_right);
 
     /* Second parse the fields */
@@ -53,7 +53,7 @@
         if(bracket_left < 0){   
             temp.clear();
             trim(temp[1]);
-            fields_result[temp[0]] = temp[1] + " " + to_string(11);
+            fields_result[temp[0]] = temp[1] + " " + to_string(4);
             continue;
         }
         // there are some brackets
@@ -128,7 +128,7 @@
                 }
                 field_name += ( " " + ts[j] );
             }
-            fields_result[key_name] = "index " + field_name;
+            fields_result[key_name] = "index" + field_name;
             continue;
         }
     }
@@ -141,15 +141,17 @@ void Database::Insert(){
 }
 
 // create table
-void Create(map<string, string>& fields_result)
+void Database::Create(const vector<string> query)
 {
     /* create table information file */
     // srtucture
     // db file name
     // fields
     // keys
-    
-
+    map<string, string> fields_result;
+    string table_name;
+    create_parse(query, table_name, fields_result);
+    CreateFile(table_name, fields_result);
 }
 
 // 删表
@@ -185,11 +187,11 @@ void Database::Select()
 
 
 void Database::CreateFile(string table_name, map<string, string> fields_result) {
-    // write the tablename to table_name.txt(whch contains all table names)
-	fstream tb_f("table_name.txt");
+    // First. write the tablename to table_name.txt(whch contains all table names)
+	fstream fs("table_name.txt");
 	char buffer[20];
-	while (!tb_f.eof()) {
-		tb_f.getline(buffer, 20);
+	while (!fs.eof()) {
+		fs.getline(buffer, 20);
 		if (strcmp(buffer, table_name.c_str()) == 0) {
 			Error("Table name exists");
 		}
@@ -198,15 +200,12 @@ void Database::CreateFile(string table_name, map<string, string> fields_result) 
 	{
 		Error("Table name length too long!");
 	}
-	tb_f << table_name << endl;
-    // write the table_meta to "table_name".txt
-    tb_f.close();
-    tb_f.open(table_name+".txt");
+	fs << table_name << endl;
+    fs.clear();
 
 
-    // create .db(data file) .key(primaey index file) .idx(index key file)
-	ifstream d_f(table_name + ".db");
-	ifstream k_f(table_name + ".key");
+    // Second. write the table_meta to "table_name".txt
+
 	table_meta_t table_meta;
     key_meta_header priKey_meta;
     data_meta_header data_meta;
@@ -240,6 +239,16 @@ void Database::CreateFile(string table_name, map<string, string> fields_result) 
         }else if(field_type == 6){ // index key
             memcpy(table_meta.indexs[table_meta.index_count], 
                             field_name.c_str(), field_name.size());
+            field_len = 0;
+            int j=0;
+            while(ss>>field_name){
+                for(;j<table_meta.fields_count;j++){
+                    if(strcmp((const char *)table_meta.fields_name[j], field_name.c_str()) == 0){
+                        field_len += table_meta.fields_len[j];
+                    }
+                }
+                j = 0;
+            }
             table_meta.indexs_max_len[table_meta.index_count] = field_len;
             table_meta.index_count += 1;
         }else{  // fields
@@ -264,11 +273,15 @@ void Database::CreateFile(string table_name, map<string, string> fields_result) 
         }
         i++;
     }
-    
+    fs.open(table_name+".txt");
+    fs.write((const char *)&table_meta, sizeof(table_meta));
+    fs.clear();
 
+
+    // Third. Set the key file header
     key_meta_t key_meta;
     // Set the primary key file meta_header
-    bzero(&key_meta, sizeof(key_meta_header));
+    bzero(&key_meta, sizeof(key_meta_header));  // 与 memset的区别就是bzero直接设置为\0 memset可以设替换的ch
     key_meta.key_size = table_meta.pri_max_len;
     key_meta.height = 1;
     key_meta.internal_node_num = 1;
@@ -295,35 +308,31 @@ void Database::CreateFile(string table_name, map<string, string> fields_result) 
     key_meta.leaf_offset = root.children[0].child = key_meta.slot;
     key_meta.slot += sizeof(leaf);
 
+    fs.open(table_name + ".key");
+    fs.write((const char *)&key_meta, sizeof(key_meta));
+    fs.clear();
+
     // Set the indedx key file meta_header
-    i = 0; 
-    for(;i<table_meta.index_count;i++){
-        bzero(&key_meta, sizeof(key_meta_header));
-        key_meta.key_size = table_meta.pri_max_len;
-        key_meta.height = 1;
-        key_meta.internal_node_num = 1;
-        key_meta.leaf_node_num = 1;
-        // slot theposition which block begin 
-        key_meta.slot = OFFSET_BLOCK;
-        
-        key_meta.page_count = 4;
-        key_meta.un_count = 0;
-        key_meta.max_size = 0;
-        key_meta.unsorted = 0;
-        key_meta.max_unsorted = 0;
-
-        // init root node
-        internal_node_t<key_type> root;
-        root.next = root.prev = root.parent = 0;
-        key_meta.root_offset = alloc(&root);
-
-        // init empty leaf
-        internal_node_t<key_type> leaf;
-        leaf.next = leaf.prev = 0;
-        leaf.parent = key_meta.root_offset;
-        key_meta.leaf_offset = root.children[0].child = alloc(&leaf);
+    if(table_meta.index_count > 0){
+        i = 0; 
+        for(;i<table_meta.index_count;i++){
+            key_meta.key_size = table_meta.indexs_max_len[i];
+            fs.open(string(table_meta.indexs[i])+".idx", ios::out);
+            fs.write((const char *)&key_meta, sizeof(key_meta));
+            fs.clear();
+        }
     }
+
+
+    // Forth. Set the data(.db) file header
+     // create .db(data file) .key(primaey index file) .idx(index key file)
+	fs.open(table_name + ".db", ios::out);     // create file automatic
+    data_meta_header data_meta;
+    fs.write((const char *)&data_meta, sizeof(data_meta));
+    fs.close();
 }
+
+
 
 // struct key_meta_t
 // {

@@ -38,6 +38,7 @@ const map<string, int> Field_t{
     {"primary", 5}, {"index", 6}
 };
 
+
 // field string convert to FIELD_TYPE(int)
 int parse_type(const string &t)
 {   
@@ -96,7 +97,7 @@ public:
     Database();
     ~Database();
     void QueryParse(int type, const vector<string> query);
-    void Create(map<string, string>& fields_result);
+    void Create(const vector<string> query);
     void Drop();
     void Insert();
     void Delete();
@@ -104,19 +105,19 @@ public:
     void Select();
     void Error(string err_str);
 protected:
-    // vector<bpt::bplus_tree<key_t>> Trees;
+    vector<Tree> Trees;
+    Trees[0] = bplus_tree<int, int>;
     vector<string> Cache_table;         // Store tables which this page store
     vector<bpt::page_t> Cache_pages;    // Store cache pages
     vector<Task> Tasks;                 // Store current waiting tasks 
     map<string, vector<int>> Locks;  // Store current Lock information
 protected:
-    void create_parse(const int & type, const vector<string>& query, map<string, string>& fields_result);
+    void create_parse(const int & type, const vector<string>& query, string & table_name, map<string, string>& fields_result);
     void Database::CreateFile(string table_name, map<string, string> fields_result);
 };
 
 
 Database::Database(){
-    Trees.reserve(TASK_C);
     Cache_table.reserve(TASK_C);
     Cache_pages.reserve(PAGE_C);
     
@@ -128,14 +129,12 @@ void Database::Error(string err_str){
 }
 
 // 请求解析(重点)
-void Database::QueryParse(int type, const vector<string> query)
+void Database::QueryParse(int typ, const vector<string> query)
 {
     // create table
     // create table table_name(id int, name char(10), primary key(id), index(name));
-     if(type == CREATE){
-        map<string, string> fields_result;
-        create_parse(type, query, fields_result);
-        Create(fields_result);
+     if((int)typ == CREATE){
+        Create(query);
     }
 }
 
