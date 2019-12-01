@@ -152,50 +152,35 @@ void Database::Create(const vector<string> query)
     string table_name;
     create_parse(query, table_name, fields_result);
     CreateFile(table_name, fields_result);
+    LoadTable(table_name);
 }
 
 // 删表
 void Database::Drop()
-{
-
-}
+{}
 
 // delete query
 void Database::Delete()
-{
-
-}
+{}
 
 // update query
 void Database::Update()
-{
-
-}
+{}
 
 // selectc query
 void Database::Select()
-{
-
-}
-
-// File structure
-// table_name
-// fields_count
-// 
+{}
 
 
 
 
-void Database::CreateFile(string table_name, map<string, string> fields_result) {
+
+void Database::CreateFile(string& table_name, map<string, string> fields_result) {
     // First. write the tablename to table_name.txt(whch contains all table names)
 	fstream fs("table_name.txt");
-	char buffer[20];
-	while (!fs.eof()) {
-		fs.getline(buffer, 20);
-		if (strcmp(buffer, table_name.c_str()) == 0) {
-			Error("Table name exists");
-		}
-	}
+	if(table_exists(table_name)){
+        Error("table exists");
+    }
 	if (table_name.size() > 20)
 	{
 		Error("Table name length too long!");
@@ -277,7 +262,7 @@ void Database::CreateFile(string table_name, map<string, string> fields_result) 
     fs.write((const char *)&table_meta, sizeof(table_meta));
     fs.clear();
 
-
+    if(!access("./" + table_))
     // Third. Set the key file header
     key_meta_t key_meta;
     // Set the primary key file meta_header
@@ -332,21 +317,41 @@ void Database::CreateFile(string table_name, map<string, string> fields_result) 
     fs.close();
 }
 
+void LoadTable(string& table_name){
+    // load table_meta 
+    while(table_opened > MAX_OPEN_TABLE){
+        sleep(0.1);
+    }
+    table_opened += 1;
+    int fd = open(table_name+".txt");
+    char * buf = mmap(NULL, sizeof(table_meta_t), 
+                                    PROT_READ|PROT_WRITE, MAP_SHAREd, fd, 0);
+    if(buf == MAP_FAILED){
+        Error("table meta information mmap failed");
+    }
+    tableMeta[table_opened - 1] = buf;
+    close(fd);
+    
+    // load key file
+    table_meta_header * k_p = (table_meta_header)buf;
+    fd = open(string(k_p->pri_name) + ".key");
+    tab_key_fd[table_name][k_p->pri_name] = fd;
+    
+}
+
+void LoadTableIndex(string& table_name, string& key_name){
+    int fd = open();
+}
 
 
-// struct key_meta_t
-// {
-//     int height;              /* height of tree (exclude leafs) */
-//     int key_size;            /* size of per key */
-//     int internal_node_num;   /* how many internal nodes */
-//     int leaf_node_num;       /* how many leafs */
-//     size_t root_offset;      /* where is the root of internal nodes */
-//     size_t leaf_offset;      /* where is the first leaf */
-//     unsigned int page_count; /* how many pages */
-//     unsigned int un_count;   /* unsorted_map link area count  */
-//     unsigned int max_size;   /* max_unsorted size */
-//     size_t unsorted;         /* empty key area lnk (when insert few data it will will be used) */
-//     size_t max_unsorted;     /* max size unsorted */
-
-//     size_t slot; /* where to store new block */
-// };
+bool table_exists(string table_name){
+    fstream fs("table_name.txt", ios::out);
+    char buffer[20];
+	while (!fs.eof()) {
+		fs.getline(buffer, 20);
+		if (strcmp(buffer, table_name.c_str()) == 0) {
+			return true;
+		}
+	}
+    return false;
+}

@@ -1,6 +1,10 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <direct.h>
 
 #include "bpt.h"
 #include "utils.hpp"
@@ -22,7 +26,12 @@ const int TASK_C = PAGE_N;
 // max page cache when there are not so many tasks
 const int PAGE_PER_TASK = 4 * 2;
 
+
+// max opened table
+const int MAX_OPEN_TABLE = 20;
+
 enum LOCK_TYPE{NONE, READ, WRITE};
+
 // 操作表的键类型
 enum INDEX_TYPE{NON_K, PRI_K, COM_K};
 
@@ -65,12 +74,12 @@ string get_type_str(int tp){
 // Task struct (which will be executed)
 struct Task
 {
-    int want_lock = NONE;
+    int want_lock = NONE; 
     int real_lock = NONE; 
     int index_type = PRI_K;
-    char table_obj[50];
-    size_t row_object;
-};
+    char table_obj[20];
+    size_t row_object;      // data id which store in data(.db) file to parse to find the position of the data
+ };
 
 /* sizeof(8 + 40 + 1240 +2800) = 4088 (Bytes) */
 struct table_meta_t{
@@ -90,6 +99,7 @@ struct table_meta_t{
     char fields_name[MAX_FIELD_C][20];  // fields name
     int fields_len[MAX_FIELD_C];    // Bytes count
 };
+using table_meta_header = table_meta_t;
 
 class Database
 {
@@ -106,14 +116,22 @@ public:
     void Error(string err_str);
 protected:
     vector<Tree> Trees;
-    Trees[0] = bplus_tree<int, int>;
-    vector<string> Cache_table;         // Store tables which this page store
-    vector<bpt::page_t> Cache_pages;    // Store cache pages
+    char * memCache[TASK_C];    // addres of Load pages
+    int table_opened;
+    char * tableMeta[MAX_OPEN_TABLE];   // opened table's table_meta
+    map<string, map<string, int>> tab_key_fd;    // open(table key) ==> fd
+
+
+
+    vector<string> Cache_table;         // Store all table_name which this page store
+
     vector<Task> Tasks;                 // Store current waiting tasks 
     map<string, vector<int>> Locks;  // Store current Lock information
 protected:
     void create_parse(const int & type, const vector<string>& query, string & table_name, map<string, string>& fields_result);
-    void Database::CreateFile(string table_name, map<string, string> fields_result);
+    void CreateFile(string table_name, map<string, string> fields_result);
+    void LoadTable(string & table_name);
+    bool table_exists(string table_name);
 };
 
 
