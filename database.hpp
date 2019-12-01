@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <direct.h>
+#include <mutex>
 
 #include "bpt.h"
 #include "utils.hpp"
@@ -117,13 +118,23 @@ public:
 protected:
     vector<Tree> Trees;
     char * memCache[TASK_C];    // addres of Load pages
-    int table_opened;
-    char * tableMeta[MAX_OPEN_TABLE];   // opened table's table_meta
-    map<string, map<string, int>> tab_key_fd;    // open(table key) ==> fd
+    // Store all table_name which this page store and the PAGE_TYPE of page
+    map<int, map<string, int>> pageType;
 
+    int table_opened;                   // table count opened
+    std::mutex table_count_mutex;       // mutex for open table
 
-
-    vector<string> Cache_table;         // Store all table_name which this page store
+    int table_bit_map;                  // the opened bit map
+    map<string, int> table_name_idx;    // table_name ==> index(used for follow)
+    
+    char * tableMeta[MAX_OPEN_TABLE];   // opened table's table_meta(get by mmap)
+    data_meta_header dataMeta[MAX_OPEN_TABLE];      // table data meta information
+    key_meta_header tablePriMeta[MAX_OPEN_TABLE];    // opened table's primary key meta 
+    vector<pair<string, key_meta_header>> indexs_meta;  // store all index meta information for table
+    
+    int tableFd[MAX_OPEN_TABLE];    // open table's table_meta fd
+    int tableData[MAX_OPEN_TABLE];   // opened table's table_data(fd object wait for mmap)
+    map<string, map<string, int>> tab_key_fd;    // open(table key) ==> fd (wait for mmap)
 
     vector<Task> Tasks;                 // Store current waiting tasks 
     map<string, vector<int>> Locks;  // Store current Lock information
@@ -132,6 +143,8 @@ protected:
     void CreateFile(string table_name, map<string, string> fields_result);
     void LoadTable(string & table_name);
     bool table_exists(string table_name);
+    int get_next_table_pos();
+    inline void Database::set_next_table_pos(int i);
 };
 
 
@@ -156,5 +169,15 @@ void Database::QueryParse(int typ, const vector<string> query)
     }
 }
 
+int Database::get_next_table_pos(){
+    int i = 0;
+    while(i < MAX_OPEN_TABLE){
+        if((1 << i) & table_bit_map != 0){
+            return i;
+        }
+    }
+}
 
-
+inline void Database::set_next_table_pos(int i){
+    table_bit_map |= (1 <<< i);
+} 

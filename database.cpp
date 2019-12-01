@@ -327,37 +327,70 @@ void Database::CreateFile(string& table_name, map<string, string> fields_result)
     fs.close();
 }
 
+/*
+    Load the table_meta information and primary key file meta()
+*/
 void LoadTable(string& table_name){
     // load table_meta 
     while(table_opened > MAX_OPEN_TABLE){
         sleep(0.1);
     }
-    table_opened += 1;
-    int fd = open(table_name+".txt", O_RDWR, 00755);
+    table_count_mutex.clock();
+    table_opened += 1;      // provent conflict
+    table_count_mutex.unlock();
+    int fd = open(table_name+".txt", O_RDWR);
     char * buf = mmap(NULL, sizeof(table_meta_t), 
                                     PROT_READ|PROT_WRITE, MAP_SHAREd, fd, 0);
     if(buf == MAP_FAILED){
         Error("table meta information mmap failed");
     }
+    tableFd[table_opened - 1] = fd;
+    table_name_idx[table_name] = table_opened - 1;
     tableMeta[table_opened - 1] = buf;
-    close(fd);
+
+    // set table opened bit map
+    int pos = get_next_table_pos();
+    set_next_table_pos(pos);
     
     // load primary key file
     table_meta_header * k_p = (table_meta_header)buf;
-    fd = open(table_name + ".key", 00755);
+    fd = open(table_name + ".key", O_RDWR);
     tab_key_fd[table_name][k_p->pri_name] = fd;
+    write(fd, (const void *)tablePriMeta[table_opened - 1], szieof(key_meta_header)));
 }
 
+/*
+    @params table_name  :
+            key_name    :   the key which used to search(complex search)
+*/
 void LoadTableIndex(string& table_name, string& key_name){
     string file_path = "./" + table_name + "/" + key_name;
-    int fd = open(file_path, 00755);
+    int fd = open(file_path, O_RDWR);
     if(fd != -1){
         tab_key_fd[table_name][key_name] =fd;
+        int pos = table_name_idx[table_name]; 
+        write(fd, (const void *)indexs_meta[pos].second, szieof(key_meta_header)));
     }else{
         Error("Error while opening key file");
     }
 }
 
+/*
+    @params table_name
+            memCacheId : which memCache the new page should be put.
+            posId      : which position in memCache(upper) should be put.
+            pageId     : which page should be load in.
+    @return bool if success
+*/
+bool Database::LoadPage(string & table_name, int memCacheId, int posId, int pageId){
+    int fd = open(table_name+".db", O_RDWR);
+    tableData[table_name_idx[table_name]] = fd;
+    char * buf = mmap(memCache[memCacheId]+4096*posId, 4096, 
+                        PROT_READ|PROT_WRITE, MAP_SHARED, fd, (pageId+1)*4096);
+    if(buf == MAP_FAILED){
+        Error("Load Page data Failed!");
+    }
+}
 
 bool table_exists(string table_name){
     fstream fs("table_name.txt", ios::out);
