@@ -262,7 +262,9 @@ void Database::CreateFile(string& table_name, map<string, string> fields_result)
     fs.write((const char *)&table_meta, sizeof(table_meta));
     fs.clear();
 
-    if(!access("./" + table_))
+    if(!access("./" + table_name)){
+        mkdir("./" + table_name);
+    }
     // Third. Set the key file header
     key_meta_t key_meta;
     // Set the primary key file meta_header
@@ -302,7 +304,7 @@ void Database::CreateFile(string& table_name, map<string, string> fields_result)
         i = 0; 
         for(;i<table_meta.index_count;i++){
             key_meta.key_size = table_meta.indexs_max_len[i];
-            fs.open(string(table_meta.indexs[i])+".idx", ios::out);
+            fs.open("./" + table_name + "/" + string(table_meta.indexs[i])+".idx", ios::out);
             fs.write((const char *)&key_meta, sizeof(key_meta));
             fs.clear();
         }
@@ -313,6 +315,14 @@ void Database::CreateFile(string& table_name, map<string, string> fields_result)
      // create .db(data file) .key(primaey index file) .idx(index key file)
 	fs.open(table_name + ".db", ios::out);     // create file automatic
     data_meta_header data_meta;
+    data_meta.begin_offset = 4096;
+    data_meta.data_count = 0;
+    data_meta.max_size = 0;
+    data_meta.max_unsorted = 0;
+    data_meta.slot = 4096;
+    data_meta.un_count = 0;
+    data_meta.unsorted = 0;
+
     fs.write((const char *)&data_meta, sizeof(data_meta));
     fs.close();
 }
@@ -323,7 +333,7 @@ void LoadTable(string& table_name){
         sleep(0.1);
     }
     table_opened += 1;
-    int fd = open(table_name+".txt");
+    int fd = open(table_name+".txt", O_RDWR, 00755);
     char * buf = mmap(NULL, sizeof(table_meta_t), 
                                     PROT_READ|PROT_WRITE, MAP_SHAREd, fd, 0);
     if(buf == MAP_FAILED){
@@ -332,15 +342,20 @@ void LoadTable(string& table_name){
     tableMeta[table_opened - 1] = buf;
     close(fd);
     
-    // load key file
+    // load primary key file
     table_meta_header * k_p = (table_meta_header)buf;
-    fd = open(string(k_p->pri_name) + ".key");
+    fd = open(table_name + ".key", 00755);
     tab_key_fd[table_name][k_p->pri_name] = fd;
-    
 }
 
 void LoadTableIndex(string& table_name, string& key_name){
-    int fd = open();
+    string file_path = "./" + table_name + "/" + key_name;
+    int fd = open(file_path, 00755);
+    if(fd != -1){
+        tab_key_fd[table_name][key_name] =fd;
+    }else{
+        Error("Error while opening key file");
+    }
 }
 
 

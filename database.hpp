@@ -151,7 +151,7 @@ void Database::QueryParse(int typ, const vector<string> query)
 {
     // create table
     // create table table_name(id int, name char(10), primary key(id), index(name));
-     if((int)typ == CREATE){
+    if((int)typ == CREATE){
         Create(query);
     }
 }
