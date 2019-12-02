@@ -92,10 +92,11 @@ struct table_meta_t{
     //8
     int fields_count = 0;   
     int index_count = 0;
-    // 40
+    // 48
     char pri_name[20];  // primary key name
     char pri_field_name[20];
     int pri_max_len;
+    int pri_field_idx;
     //1240
     char indexs[MAX_INDEX_C][20];       // index key name
     char idx_field_name[MAX_INDEX_C][MAX_FIELD_C];  // the fields for per index contrains
@@ -142,6 +143,8 @@ protected:
     int tableFd[MAX_OPEN_TABLE];    // open table's table_meta fd
     int tableData[MAX_OPEN_TABLE];   // opened table's table_data(fd object wait for mmap)
     map<string, map<string, int>> tab_key_fd;    // open(table key) ==> fd (wait for mmap)
+
+    
 
     vector<Task> Tasks;                 // Store current waiting tasks 
     map<string, vector<int>> Locks;  // Store current Lock information

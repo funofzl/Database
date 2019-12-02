@@ -77,8 +77,8 @@ using page_header = page_t;
 /* row header (standord (16 Bytes) + data_len)*/
 struct row_t{
     char status;    /* 0碎片，1普通记录, 2他处数据引用(data_len可用，其他无用) */
-    /* char unused */
-    unsigned short data_len;
+    char dic_off;   /* to find the offset of the row_dic (which is sorted) */
+    unsigned short data_len;    /* store the real length of row_data */
     unsigned short null_map_size; /* field */
     short null_map; // a part of null_map if sizeof(null_map) > 16 there will be new null_map after row_t but before data
     size_t  next;  /* --row_id-- like pointer point to next raw  (64 = 50 + 12 ) 

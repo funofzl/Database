@@ -234,7 +234,7 @@ void Database::Insert(const vector<string>& query){
     row_data.data_len = len;
     row_data.null_map = null_map;
     // get the data_dir position of this data
-    size_t data_dir_pos = get_next_dir_off(table_name); 
+    size_t data_dir_pos = get_next_dir_off(table_name, len); // get next store position by the len to use the unsorted 
     unsigned short data_off = data_dir_pos & 255;   // position of data_dir in its page
     
     // get the page_pos (the position of page loaded in caceh pages)
@@ -249,18 +249,34 @@ void Database::Insert(const vector<string>& query){
     row_header * data_p = (row_header *)memCache[0] + 4096 * page_pos +  row_d_p->row_off;
     // now we had get the page_pos and dir_off;
     if((row_d_p->row_len - data.size()) > (sizeof(row_dic) + table_meta_p->min_data_len)){
-        // 前一个row_dir 更改data_off 信息
+        // 后(物理上的后)一个row_dir 更改data_off 信息
+        // find the next row_dic struct by the next offset row data 
+        row_data_header * data_p_next = 
+                (row_data_header*)(data_p + sizeof(data_row_header) + data_p->data_len);
+        row_dic * row_d_p_next = row_d_p & 0xffffffffffff0000 + 4096 - (1 + (int)data_p_next->dic_off * sizeof(row_dic));
+        row_d_p_next->row_len += (row_d_p->row_len - data.size());
+        row_d_p_next->row_off -= (row_d_p->row_len - data.size());
+        memmove(data_p_next + (row_d_p->row_len - data.size()), data_p_next, row_d_p->row_len - data.size());
     }
     // now we will write the data to memCache 
+    void * new_p = memcpy((void*)data_p, (void *)&row_data, sizeof(row_data));
+    new_p = memcpy(new_p, (void *)data.c_str(), data.size());
 
 
     
+    int t_idx = table_name_idx[table_name];
+    /* update the data_meta */
+    // data_cont
+    // last 
+    
+    dataMeta[t_idx].data_count += 1;
+    set_last_next(dataMeta[t_idx].last);
 
-    // update the data_meta 
-
-    // insert in the primary key file
-
-    // insert in the index key file
+    /* insert in the primary key file */
+    int pri_field_idx = ((table_meta_header *)tableMeta[t_idx])->pri_field_idx;
+    string pri_value = field_values[pri_field_idx];
+    
+    /* insert in the index key file */
 
 }
 
