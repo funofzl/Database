@@ -144,7 +144,7 @@ protected:
     int tableData[MAX_OPEN_TABLE];   // opened table's table_data(fd object wait for mmap)
     map<string, map<string, int>> tab_key_fd;    // open(table key) ==> fd (wait for mmap)
 
-    
+    vector<map<string, Tree>> Trees(MAX_OPEN_TABLE);
 
     vector<Task> Tasks;                 // Store current waiting tasks 
     map<string, vector<int>> Locks;  // Store current Lock information

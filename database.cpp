@@ -274,8 +274,16 @@ void Database::Insert(const vector<string>& query){
 
     /* insert in the primary key file */
     int pri_field_idx = ((table_meta_header *)tableMeta[t_idx])->pri_field_idx;
+    string pri_name = ()tableMeta[t_idx]->
     string pri_value = field_values[pri_field_idx];
-    
+    if(((table_meta_header*)tableMeta[t_idx])->fields_type[pri_field_idx] == "int")
+    {
+        typedef typename bplus_tree<int, size_t> BTree;
+    }else{
+        typedef typename bplus_tree<string, size_t> BTree;
+    }
+    Trees[idx][]
+    (BTree*)(&Trees[t_idx][])
     /* insert in the index key file */
 
 }
