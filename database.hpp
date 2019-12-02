@@ -71,6 +71,11 @@ string get_type_str(int tp){
     return "error";
 }
 
+struct cachePage_t{
+    string table_name;  // which table_name the cache store
+    size_t pageId;      // which page the cache store
+    int type;
+};
 
 // Task struct (which will be executed)
 struct Task
@@ -82,7 +87,7 @@ struct Task
     size_t row_object;      // data id which store in data(.db) file to parse to find the position of the data
  };
 
-/* sizeof(8 + 40 + 1240 +2800) = 4088 (Bytes) */
+/* table information */
 struct table_meta_t{
     //8
     int fields_count = 0;   
@@ -99,6 +104,8 @@ struct table_meta_t{
     int fields_type[MAX_FIELD_C];       // fields type
     char fields_name[MAX_FIELD_C][20];  // fields name
     int fields_len[MAX_FIELD_C];    // Bytes count
+
+    int min_data_len = 0;           // min data length (used for space reuse )
 };
 using table_meta_header = table_meta_t;
 
@@ -109,8 +116,8 @@ public:
     ~Database();
     void QueryParse(int type, const vector<string> query);
     void Create(const vector<string> query);
-    void Drop();
-    void Insert();
+    void Drop(const string& table_name);
+    void Insert(const vector<string>& query);
     void Delete();
     void Update();
     void Select();
@@ -119,7 +126,7 @@ protected:
     vector<Tree> Trees;
     char * memCache[TASK_C];    // addres of Load pages
     // Store all table_name which this page store and the PAGE_TYPE of page
-    map<int, map<string, int>> pageType;
+    vector<vector<cachePage_t>> pageType;    // task(thread)->pageId
 
     int table_opened;                   // table count opened
     std::mutex table_count_mutex;       // mutex for open table
@@ -142,9 +149,17 @@ protected:
     void create_parse(const int & type, const vector<string>& query, string & table_name, map<string, string>& fields_result);
     void CreateFile(string table_name, map<string, string> fields_result);
     void LoadTable(string & table_name);
+    void LoadTableIndex(string& table_name, string& key_name);
+    bool LoadPage(string & table_name, int memCacheId, int posId, size_t pageId);
+    
+    void insert_parse(const vector<string>& query, string& table_name, vector<string>& field_values);
+
     bool table_exists(string table_name);
+    bool page_exists(size_t pageId);
     int get_next_table_pos();
+    size_t get_next_data_off(const strnig & table_name);
     inline void Database::set_next_table_pos(int i);
+    int getNextRepPage(int taskId);
 };
 
 
@@ -160,14 +175,25 @@ void Database::Error(string err_str){
 }
 
 // 请求解析(重点)
-void Database::QueryParse(int typ, const vector<string> query)
+void Database::QueryParse(int type, const vector<string> query)
 {
     // create table
     // create table table_name(id int, name char(10), primary key(id), index(name));
-    if((int)typ == CREATE){
-        Create(query);
+
+    switch((int)type){
+        case CREATE:
+            Create(query);
+        break;
+        case INSERT:
+            Insert(query);
+        break;
+        default:
+            Error("Operation type error");
+        break;
     }
 }
+
+
 
 int Database::get_next_table_pos(){
     int i = 0;
@@ -181,3 +207,30 @@ int Database::get_next_table_pos(){
 inline void Database::set_next_table_pos(int i){
     table_bit_map |= (1 <<< i);
 } 
+
+bool Database::table_exists(string table_name){
+    fstream fs("table_name.txt", ios::out);
+    char buffer[20];
+	while (!fs.eof()) {
+		fs.getline(buffer, 20);
+		if (strcmp(buffer, table_name.c_str()) == 0) {
+			return true;
+		}
+	}
+    return false;
+}
+
+
+
+size_t Database::get_next_dir_off(const strnig & table_name){
+    data_meta_header * data_meta_p = &dataMeta[table_name_idx[table_name]];
+    data_meta_p->
+}
+
+bool Database::page_exists(size_t){
+
+};
+
+int Database::getNextRepPage(int taskId){
+
+}

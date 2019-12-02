@@ -47,13 +47,14 @@ using key_meta_header = struct key_meta_t;
 
 /* standord size(40) Bytes */
 struct data_meta_t{
-    unsigned short data_count;  /* data count */
+    unsigned int data_count;  /* data count */
     size_t  begin_offset; /* where is the root of internal nodes */
     size_t  slot;        /* where to store new block */
     size_t  unsorted;    /* empty key area lnk (when insert few data it will will be used) */ 
     size_t  max_unsorted;    /* max size unsorted */
     unsigned int un_count;  /* unsorted_map link area count  */
     unsigned int max_size;  /* max_unsorted size */
+    size_t last = 0;        /* store thee last data_dir offset(56 + 8) */
 };
 using data_meta_header = data_meta_t;
 
@@ -73,10 +74,11 @@ struct page_t{
 using page_header = page_t;
 
 
-/* row header (standord (16 Bytes))*/
+/* row header (standord (16 Bytes) + data_len)*/
 struct row_t{
     char status;    /* 0碎片，1普通记录, 2他处数据引用(data_len可用，其他无用) */
     /* char unused */
+    unsigned short data_len;
     unsigned short null_map_size; /* field */
     short null_map; // a part of null_map if sizeof(null_map) > 16 there will be new null_map after row_t but before data
     size_t  next;  /* --row_id-- like pointer point to next raw  (64 = 50 + 12 ) 
@@ -92,7 +94,9 @@ using row_header = row_t;
 // 即使删除 空间不会回收 所以不需要标记id, 顺着来就行, 中间空间合并后后续顺序也不变，因为id只是个标志而已, 不一定有顺序
 struct row_direc_t{
     short row_len;  // 第一位为1时是负数，表示此块被弃用, 表示被前或后合并掉了
-    short offset;
+                    // 为0时， 表示此块是空闲的
+    short row_off;
+    size_t next;    // 56 + 8  (8 stand for position in page, 56->pageId)
 };
 using row_dic = row_direc_t;
 

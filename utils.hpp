@@ -14,6 +14,13 @@ void trim(string& s){
     s = s.substr(al_left_index, al_right_index);
 }
 
+void trimQuote(string& s){
+    s = trim(s);
+    int left_quote = s.find_first_of('"');
+    int right_quote = s.find_last_of('"');
+    s = s.substr(left_quote, right_quote - left_quote - 1);
+}
+
 void split(char * s, vector<string>& result){
     char * temp = strtok(s, " ");
     while(temp != NULL){
@@ -63,3 +70,9 @@ string map2jsonstr(const map<string, string>& map_info)
 	return jObject.toStyledString();
 }
 
+void fill(string & s, const char c, int length){
+    if(s.size() < length){
+        string padding(length-s.size(), c);
+        s = s + padding;
+    }
+}

@@ -53,7 +53,7 @@
         if(bracket_left < 0){   
             temp.clear();
             trim(temp[1]);
-            fields_result[temp[0]] = temp[1] + " " + to_string(4);
+            fields_result[temp[0]] = temp[1] + " " + to_string(11);
             continue;
         }
         // there are some brackets
@@ -135,13 +135,8 @@
 }
    
 // 以下几个操作注意约束和限制条件(留坑完事)
-// 插入
-void Database::Insert(){
-    
-}
-
 // create table
-void Database::Create(const vector<string> query)
+void Database::Create(const vector<string>& query)
 {
     /* create table information file */
     // srtucture
@@ -156,8 +151,118 @@ void Database::Create(const vector<string> query)
 }
 
 // 删表
-void Database::Drop()
-{}
+void Database::Drop(const string & table_name)
+{
+    // if the table exists
+    // drop files
+    // delete from table_name.txt
+}
+
+// insert table_name values(field1, field2, field3);
+void Database::insert_parse(const vector<string>& query, string& table_name, vector<string>& field_values){
+    table_name = query[1];
+    if(!table_exists(table_name)){
+        Error("table not exists");
+    }
+    int i = 0;
+    string qs;
+    while(i < query.size()){
+        qs += query[i];
+        i++;
+    }
+
+    int bracket_left = qs.find_first_of("(");
+    if(bracket_left < 0){
+        Error("syntax error around values");
+    }
+    int bracket_right = qs.find_last_of(")");
+    if(bracket_right < 0){
+        Error("syntax error at end");
+    }
+
+    string values = qs.substr(bracket_left+1, bracket_right-bracket_left-1);
+    stringstream ss(values);
+    string temp;
+    while(getline(ss, temp, ',')){
+        trimQuote(temp);
+        field_values.push_back(temp);
+    }
+}
+
+// 插入
+void Database::Insert(const vector<string>& query){
+    string table_name;
+    vector<string> field_values;
+    insert_parse(query, table_name, field_values);
+
+    int pos;    // get the load position of this table 
+    auto iter = table_name_idx.find(table_name);
+    if(iter == table_name_idx.end()){
+        // Load table
+        pos = LoadTable(table_name);
+    }else{
+        pos = iter->second;
+    }
+
+    table_meta_header * table_meta_p = (table_meta_header*)tableMeta[pos];
+    if(table_meta_p->fields_count != field_values.size()){
+        Error("The field count is not correspond!");
+    }
+    row_header row_data;
+    row_data.status = 1;
+    
+    unsigned short null_map = 0;
+    string data;
+    int len;    // have stored data length
+    int i=0;
+    for(;i < field_values.size();i++){
+        if(field_values[i] == "NULL"){
+            null_map |= (1 << i);
+        }else if(table_meta_p->fields_type[i] == "int"){
+            data += fill(field_values[i], '0', table_meta_p->fields_len[i]);
+            len += table_meta_p->fields_len[i];
+        }else{
+            if(field_values.size() > table_meta_p->fields_len[i]){
+                if(table_meta_p->fields_type == "char"){
+                    Error("Too long data for char type of " + table_meta_p->fields_name);
+                }
+            }
+            data += field_values[i];
+            len += field_values.size();
+        }
+    }
+    row_data.data_len = len;
+    row_data.null_map = null_map;
+    // get the data_dir position of this data
+    size_t data_dir_pos = get_next_dir_off(table_name); 
+    unsigned short data_off = data_dir_pos & 255;   // position of data_dir in its page
+    
+    // get the page_pos (the position of page loaded in caceh pages)
+    int page_pos = page_exists(data_dir_pos >> 8));
+    if(page_pos == -1{
+        page_pos = getNextRepPage(0);
+        LoadPage(table_name, 0, replace_pageId, data_dir_pos);  
+    }
+    int dir_off = 4096 - ( data_off + 1 ) * sizeof(cachePage_t);
+    // get the data * and row_t * to set value
+    row_dic * row_d_p =  (row_dic *)memCache[0] + 4096 * page_pos + dir_off;
+    row_header * data_p = (row_header *)memCache[0] + 4096 * page_pos +  row_d_p->row_off;
+    // now we had get the page_pos and dir_off;
+    if((row_d_p->row_len - data.size()) > (sizeof(row_dic) + table_meta_p->min_data_len)){
+        // 前一个row_dir 更改data_off 信息
+    }
+    // now we will write the data to memCache 
+
+
+    
+
+    // update the data_meta 
+
+    // insert in the primary key file
+
+    // insert in the index key file
+
+}
 
 // delete query
 void Database::Delete()
@@ -330,7 +435,7 @@ void Database::CreateFile(string& table_name, map<string, string> fields_result)
 /*
     Load the table_meta information and primary key file meta()
 */
-void LoadTable(string& table_name){
+int Database::LoadTable(string& table_name){
     // load table_meta 
     while(table_opened > MAX_OPEN_TABLE){
         sleep(0.1);
@@ -357,13 +462,15 @@ void LoadTable(string& table_name){
     fd = open(table_name + ".key", O_RDWR);
     tab_key_fd[table_name][k_p->pri_name] = fd;
     write(fd, (const void *)tablePriMeta[table_opened - 1], szieof(key_meta_header)));
+    
+    return pos; 
 }
 
 /*
     @params table_name  :
             key_name    :   the key which used to search(complex search)
 */
-void LoadTableIndex(string& table_name, string& key_name){
+void Database::LoadTableIndex(string& table_name, string& key_name){
     string file_path = "./" + table_name + "/" + key_name;
     int fd = open(file_path, O_RDWR);
     if(fd != -1){
@@ -378,28 +485,20 @@ void LoadTableIndex(string& table_name, string& key_name){
 /*
     @params table_name
             memCacheId : which memCache the new page should be put.
-            posId      : which position in memCache(upper) should be put.
+            posId      : which position in memCache(upper) should be put(from 0).
             pageId     : which page should be load in.
     @return bool if success
 */
-bool Database::LoadPage(string & table_name, int memCacheId, int posId, int pageId){
+bool Database::LoadPage(string & table_name, int memCacheId, int posId, size_t pageId){
+    // munmap function (留坑)
+    // ...
     int fd = open(table_name+".db", O_RDWR);
     tableData[table_name_idx[table_name]] = fd;
     char * buf = mmap(memCache[memCacheId]+4096*posId, 4096, 
                         PROT_READ|PROT_WRITE, MAP_SHARED, fd, (pageId+1)*4096);
     if(buf == MAP_FAILED){
-        Error("Load Page data Failed!");
+        return false;
     }
+    return true;
 }
 
-bool table_exists(string table_name){
-    fstream fs("table_name.txt", ios::out);
-    char buffer[20];
-	while (!fs.eof()) {
-		fs.getline(buffer, 20);
-		if (strcmp(buffer, table_name.c_str()) == 0) {
-			return true;
-		}
-	}
-    return false;
-}
