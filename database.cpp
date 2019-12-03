@@ -482,7 +482,7 @@ int Database::LoadTable(string& table_name){
     table_count_mutex.clock();
     table_opened += 1;      // provent conflict
     table_count_mutex.unlock();
-    int fd = open(table_name+".txt", O_RDWR);
+    int fd = open(string(table_name+".txt").c_str(), O_RDWR);
     char * buf = mmap(NULL, sizeof(table_meta_t), 
                                     PROT_READ|PROT_WRITE, MAP_SHAREd, fd, 0);
     if(buf == MAP_FAILED){
@@ -497,10 +497,10 @@ int Database::LoadTable(string& table_name){
     set_next_table_pos(pos);
     
     // load primary key file
-    table_meta_header * k_p = (table_meta_header)buf;
-    fd = open(table_name + ".key", O_RDWR);
+    table_meta_header * k_p = (table_meta_header*)buf;
+    fd = open(string(table_name + ".key").c_str(), O_RDWR);
     tab_key_fd[table_name][k_p->pri_name] = fd;
-    write(fd, (const void *)tablePriMeta[table_opened - 1], szieof(key_meta_header)));
+    write(fd, (const void *)&(tablePriMeta[table_opened - 1]), sizeof(key_meta_header)));
     
     return pos; 
 }
@@ -511,11 +511,11 @@ int Database::LoadTable(string& table_name){
 */
 void Database::LoadTableIndex(string& table_name, string& key_name){
     string file_path = "./" + table_name + "/" + key_name;
-    int fd = open(file_path, O_RDWR);
+    int fd = open(file_path.c_str(), O_RDWR);
     if(fd != -1){
         tab_key_fd[table_name][key_name] =fd;
         int pos = table_name_idx[table_name]; 
-        write(fd, (const void *)indexs_meta[pos].second, szieof(key_meta_header)));
+        write(fd, (const void *)&(indexs_meta[pos]).second, sizeof(key_meta_header));
     }else{
         Error("Error while opening key file");
     }
@@ -531,7 +531,7 @@ void Database::LoadTableIndex(string& table_name, string& key_name){
 bool Database::LoadPage(string & table_name, int memCacheId, int posId, size_t pageId){
     // munmap function (留坑)
     // ...
-    int fd = open(table_name+".db", O_RDWR);
+    int fd = open(string(table_name+".db").c_str(), O_RDWR);
     tableData[table_name_idx[table_name]] = fd;
     char * buf = mmap(memCache[memCacheId]+4096*posId, 4096, 
                         PROT_READ|PROT_WRITE, MAP_SHARED, fd, (pageId+1)*4096);
@@ -539,5 +539,18 @@ bool Database::LoadPage(string & table_name, int memCacheId, int posId, size_t p
         return false;
     }
     return true;
+}
+
+
+void Database::expandExtend(string & table_name, char * expand_ob){
+    int page_count = get_page_count(table_name, expand_ob);
+    page_header pageHead;
+    pageHead.data_offset = sizeof(page_header);
+    pageHead.free_space = 4096 - sizeof(page_header);
+    pageHead.free_ratio = 100 - (int)(pageHead.free_space/4096);
+    pageHead.page_id = page_count;
+    memcpy(&pageHead.record_type, expand_ob, strlen(expand_ob)); // DATA PRI_K COM_K
+    pageHead.row_dic_size = 0;      // row_dic count = 0
+    pageHead.row_space = 0;         // there are not data
 }
 

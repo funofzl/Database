@@ -37,7 +37,7 @@ const int MAX_OPEN_TABLE = 20;
 enum LOCK_TYPE{NONE, READ, WRITE};
 
 // 操作表的键类型
-enum INDEX_TYPE{NON_K, PRI_K, COM_K};
+enum INDEX_TYPE{DATA, PRI_K, COM_K};
 
 enum OP{CREATE, DROP, SELECT, INSERT, UPDATE, DELETE};
 
@@ -113,7 +113,7 @@ struct table_meta_t{
 
     int min_data_len = 0;           // min data length (used for space reuse )
 };
-using table_meta_header = table_meta_t;
+using table_meta_header = struct table_meta_t;
 
 class Database
 {
@@ -133,7 +133,7 @@ protected:
     char * memCache[TASK_C];    // addres of Load pages
     // Store all table_name which this page store and the PAGE_TYPE of page
     vector<vector<cachePage_t>> pagetypes;    // task(thread)->pageId
-    int[TASK_C][PAGE_N] ReQueue;               // log the replace sequence of pages
+    int ReQueue[TASK_C][PAGE_N];               // log the replace sequence of pages
     
 
     int table_opened;                   // table count opened
@@ -145,7 +145,7 @@ protected:
     char * tableMeta[MAX_OPEN_TABLE];   // opened table's table_meta(get by mmap)
     data_meta_header dataMeta[MAX_OPEN_TABLE];      // table data meta information
     key_meta_header tablePriMeta[MAX_OPEN_TABLE];    // opened table's primary key meta 
-    vector<pair<string, key_meta_header>> indexs_meta;  // store all index meta information for table
+    vector<map<string, key_meta_header>> indexs_meta;  // store all index meta information for table
     
     int tableFd[MAX_OPEN_TABLE];    // open table's table_meta fd
     int tableData[MAX_OPEN_TABLE];   // opened table's table_data(fd object wait for mmap)
@@ -164,17 +164,24 @@ protected:
     
     void insert_parse(const vector<string>& query, string& table_name, vector<string>& field_values);
 
-    bool table_exists(string table_name);
-    int page_exists(size_t pageId);
+    void expandExtend(string& table_name, char * expand_ob);
+    
     // table
     int get_next_table_pos();
     inline void set_next_table_pos(int i);
     // data
-    size_t get_next_dir_off(int t_idx, int length);
+    size_t get_next_dir_off(int t_idx, int length, int& from_where);
     int getNextRepPage(int taskId);
 
     void set_last_next(int t_idx, size_t dir_off);
     void set_dir_next(size_t prv_dic, size_t next_dic_off);
+    size_t get_dir_next(size_t dir_off);
+    
+    //page
+    int get_page_count(string & table_name, char * expand_type);
+
+    bool table_exists(string table_name);
+    int page_exists(size_t pageId);
 };
 
 
@@ -222,7 +229,7 @@ int Database::get_next_table_pos(){
 }
 
 inline void Database::set_next_table_pos(int i){
-    table_bit_map |= (1 <<< i);
+    table_bit_map |= (1 << i);
 } 
 
 
@@ -231,7 +238,7 @@ inline void Database::set_next_table_pos(int i){
 // get the next row_dic to store the row_data
 size_t Database::get_next_dir_off(int t_idx, int target_len, int & from_where){
     string table_name;
-    map<string, int>::iterator iter = table_name_idx.cbegin();
+    map<string, int>::const_iterator iter = table_name_idx.cbegin();
     while (iter != table_name_idx.cend())
     {
         if (iter->second == t_idx)
@@ -270,7 +277,7 @@ size_t Database::get_next_dir_off(int t_idx, int target_len, int & from_where){
         // there are no proper empty unsorted block
         // wwe have to ccreate new block
         if(data_meta_p->slot == 0){
-            exandExtend(table_name);
+            expandExtend(table_name, "data");
         }
         target_off = data_meta_p->slot;
         from_where = 0;
@@ -294,7 +301,7 @@ size_t Database::get_next_dir_off(int t_idx, int target_len, int & from_where){
 
 }
 
-int getPage
+
 
 int Database::getNextRepPage(int taskId){
     int i=0;
@@ -331,10 +338,33 @@ void Database::set_dir_next(size_t prv_dic, size_t next_dic_off){
     ((row_dic *)buf)->next = next_dic_off;
     // mmap同步
     msync(buf, sizeof(row_dic), MS_SYNC);   // 同步后返回
+    munmap(buf, sizeof(row_dic), MS_SYNC);
+}
+
+size_t Database::get_dir_next(size_t dir_off){
+    size_t pageId = (prv_dic >> 8) << 8;
+    int page_in_off = 4096 - (1 + (prv_dic & 255)) * sizeof(row_dic);
+    int off = (pageId + 1) * 4096 + page_in_off;
+    void *buf = mmap(NULL, sizeof(row_dic), PROT_READ | PROT_WRITE, MAP_SHARED, tableData[t_idx], off);
+    if (buf == MAP_FAILED)
+    {
+        Error("Set last next : mmap error");
+    }
+    // get
+    return ((row_dic *)buf)->next;
+}
+
+int Database::get_page_count(string & table_name, char * expand_ob){
+    int t_idx = table_name_idx[table_name];
+    map<string, key_meta_header>::const_iterator iter = indexs_meta.find(string(expand_ob));
+    if(iter == indexs_meta.cend()){
+        LoadTableIndex(table_name, string(expand_ob));
+    }
+    return indexs_meta[t_idx][string(expand_ob)].page_count;
 }
 
 
-
+// ************* exists *****************//
 
 bool Database::table_exists(string table_name)
 {
@@ -360,7 +390,7 @@ int Database::page_exists(const string &table_name, const char *tp, size_t pageI
         {
             if (pagetypes[0][i].pageId == pageId)
             {
-                if (pagetypes[0][i].pageId == tp)
+                if (strcmp(pagetypes[0][i].type_name, tp) == 0)
                 {
                     return i;
                 }

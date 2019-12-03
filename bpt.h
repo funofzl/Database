@@ -33,8 +33,6 @@ struct key_meta_t{
     int key_size;   /* size of per key */
     int internal_node_num; /* how many internal nodes */
     int leaf_node_num;     /* how many leafs */
-    size_t  root_offset; /* where is the root of internal nodes */
-    size_t  leaf_offset; /* where is the first leaf */
     unsigned int page_count; /* how many pages */
     unsigned int un_count;  /* unsorted_map link area count  */
     unsigned int max_size;  /* max_unsorted size */
@@ -42,6 +40,9 @@ struct key_meta_t{
     size_t  max_unsorted;    /* max size unsorted (56 + 8 ==> data_dir_off)*/
 
     size_t  slot;        /* where to store new block */
+
+    size_t  root_offset; /* where is the root of internal nodes */
+    size_t  leaf_offset; /* where is the first leaf */
 };
 using key_meta_header = struct key_meta_t;
 
@@ -57,7 +58,7 @@ struct data_meta_t{
     unsigned int max_size;  /* max_unsorted size */
     size_t last = 0;        /* store thee last data_dir offset(56 + 8) */
 };
-using data_meta_header = data_meta_t;
+using data_meta_header = struct data_meta_t;
 
 
 /* page header size(16) Bytes*/
@@ -66,13 +67,13 @@ struct page_t{
     char record_type;  /* 记录的数据类型(data  (index)key)   from enum record_type */ 
 
     short free_space;   /* free space */
-    short row_space;
-    short row_dic_size;
+    short row_space;    /* row data space */
+    short row_dic_size; /* row dic space */
 
     short data_offset;
     float free_ratio;
 };
-using page_header = page_t;
+using page_header = struct page_t;
 
 
 /* row header (standord (16 Bytes) + data_len)*/
@@ -87,7 +88,7 @@ struct row_t{
     /* null_map */
     /* data */
 };
-using row_header = row_t;
+using row_header = struct row_t;
 
 
 
@@ -99,7 +100,7 @@ struct row_direc_t{
     short row_off;
     size_t next;    // 56 + 8  (8 stand for position in page, 56->pageId)
 };
-using row_dic = row_direc_t;
+using row_dic = struct row_direc_t;
 
 
 
