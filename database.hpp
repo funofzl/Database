@@ -74,7 +74,7 @@ string get_type_str(int tp){
 struct cachePage_t{
     string table_name;  // which table_name the cache store
     size_t pageId;      // which page the cache store
-    int type;
+    char type_name[20]; // which type this page store   contains(data, peimay key, index key)
 };
 
 // Task struct (which will be executed)
@@ -127,7 +127,9 @@ protected:
     vector<Tree> Trees;
     char * memCache[TASK_C];    // addres of Load pages
     // Store all table_name which this page store and the PAGE_TYPE of page
-    vector<vector<cachePage_t>> pageType;    // task(thread)->pageId
+    vector<vector<cachePage_t>> pagetypes;    // task(thread)->pageId
+    int[TASK_C][PAGE_N] ReQueue;               // log the replace sequence of pages
+    
 
     int table_opened;                   // table count opened
     std::mutex table_count_mutex;       // mutex for open table
@@ -144,7 +146,7 @@ protected:
     int tableData[MAX_OPEN_TABLE];   // opened table's table_data(fd object wait for mmap)
     map<string, map<string, int>> tab_key_fd;    // open(table key) ==> fd (wait for mmap)
 
-    vector<map<string, Tree>> Trees(MAX_OPEN_TABLE);
+    vector<map<string, Tree> > Trees(MAX_OPEN_TABLE);   
 
     vector<Task> Tasks;                 // Store current waiting tasks 
     map<string, vector<int>> Locks;  // Store current Lock information
@@ -158,11 +160,16 @@ protected:
     void insert_parse(const vector<string>& query, string& table_name, vector<string>& field_values);
 
     bool table_exists(string table_name);
-    bool page_exists(size_t pageId);
+    int page_exists(size_t pageId);
+    // table
     int get_next_table_pos();
-    size_t get_next_data_off(const strnig & table_name);
-    inline void Database::set_next_table_pos(int i);
+    inline void set_next_table_pos(int i);
+    // data
+    size_t get_next_dir_off(int t_idx, int length);
     int getNextRepPage(int taskId);
+
+    void set_last_next(int t_idx, size_t dir_off);
+    void set_dir_next(size_t prv_dic, size_t next_dic_off);
 };
 
 
@@ -198,6 +205,8 @@ void Database::QueryParse(int type, const vector<string> query)
 
 
 
+
+
 int Database::get_next_table_pos(){
     int i = 0;
     while(i < MAX_OPEN_TABLE){
@@ -211,29 +220,140 @@ inline void Database::set_next_table_pos(int i){
     table_bit_map |= (1 <<< i);
 } 
 
-bool Database::table_exists(string table_name){
+
+
+
+// get the next row_dic to store the row_data
+size_t Database::get_next_dir_off(int t_idx, int target_len){
+    // 大小比较
+    data_meta_header * data_meta_p = &dataMeta[t_idx];
+    if(data_meta_p->max_size > target_len){
+        int max_len = 0;
+        // row_dic data_dic_p = get_dir_off(data_meta_p->unsorted);
+        if(data_meta_p->un_count > 1){
+            size_t cur_p = data_meta_p->unsorted, prv_p;
+            for(int i=0;i<data_meta_p->un_count;i++){
+                if(i != 0){
+                    cur_p = get_dir_next(prv_p);
+                }
+                if(cur_p == data_meta_p->max_unsorted){
+                    if(i == 0){
+                        data_meta_p->unsorted = get_dir_next(cur_p);
+                    }else{
+                        set_dir_next(prv_p, get_dir_next(cur_p));
+                    }
+                }
+                prv_p = cur_p;
+            }
+        }else{
+            data_meta_p->unsorted = 0;
+            data_meta_p->max_size = 0;
+        }
+        data_meta_p->un_count -= 1;
+        return data_meta_p->max_unsorted;
+    }
+
+    // there are no proper empty unsorted block
+    // wwe have to ccreate new block
+    
+    // get the last page to check if this page has capacity
+    int pageId = data_meta_p->slot >> 8;
+
+    string table_name;
+    map<string, int>::iterator iter = table_name_idx.cbegin();
+    while(iter != table_name_idx.cend()){
+        if(iter->second == t_idx){
+            table_name = iter->first;
+        }
+    }
+
+    int PagePos = page_exists(pageId);  // get the position loaded in memCache
+    if (!PagePos)
+    {
+        RepPos = getNextRepPage(0);
+        LoadPage(table_name, 0, PagePos, pageId);
+    }
+    // if the free_ratio is too large
+    if(((page_header*)(memCache[0]+4096 * PagePos))->free_ratio > 80){
+        if()
+        pageId += 1;
+    }
+
+    dataMeta[t_idx].slot += ;
+}
+
+int getPage
+
+int Database::getNextRepPage(int taskId){
+    int i=0;
+    for(;i<PAGE_N;i++){
+        if(ReQueue[taskId][i] == 0){
+            return i;
+        }
+    }
+    int target = ReQueue[taskId][i-1];
+    memmove(&ReQueue[taskId][1], ReQueue[taskId][0], PAGE_N);
+    ReQueue[taskId][0] = target;
+    return target;
+}
+
+
+
+
+void Database::set_last_next(int t_idx, size_t dir_off){
+    size_t last_off = ((data_meta_header*)&dataMeta[t_idx])->last;
+    set_dir_next(last_off, dir_off);
+    dataMeta[t_idx].last = dir_off;
+}
+    
+void Database::set_dir_next(size_t prv_dic, size_t next_dic_off){
+    size_t pageId = (prv_dic >> 8) << 8;
+    int page_in_off = 4096 - (1 + (prv_dic & 255)) * sizeof(row_dic);
+    int off = (pageId + 1) * 4096 + page_in_off;
+    void *buf = mmap(NULL, sizeof(row_dic), PROT_READ | PROT_WRITE, MAP_SHARED, tableData[t_idx], off);
+    if (buf == MAP_FAILED)
+    {
+        Error("Set last next : mmap error");
+    }
+    // update
+    ((row_dic *)buf)->next = next_dic_off;
+    // mmap同步
+    msync(buf, sizeof(row_dic), MS_SYNC);   // 同步后返回
+}
+
+
+
+
+bool Database::table_exists(string table_name)
+{
     fstream fs("table_name.txt", ios::out);
     char buffer[20];
-	while (!fs.eof()) {
-		fs.getline(buffer, 20);
-		if (strcmp(buffer, table_name.c_str()) == 0) {
-			return true;
-		}
-	}
+    while (!fs.eof())
+    {
+        fs.getline(buffer, 20);
+        if (strcmp(buffer, table_name.c_str()) == 0)
+        {
+            return true;
+        }
+    }
     return false;
 }
 
-
-
-size_t Database::get_next_dir_off(const strnig & table_name){
-    data_meta_header * data_meta_p = &dataMeta[table_name_idx[table_name]];
-    data_meta_p->
-}
-
-bool Database::page_exists(size_t){
-
+int Database::page_exists(const string &table_name, const char *tp, size_t pageId)
+{
+    int i = 0, j = 0;
+    for (i = 0; i < pagetypes[0].size(); i++)
+    {
+        if (pagetypes[0][i].table_name == table_name)
+        {
+            if (pagetypes[0][i].pageId == pageId)
+            {
+                if (pagetypes[0][i].pageId == tp)
+                {
+                    return i;
+                }
+            }
+        }
+    }
+    return -1;
 };
-
-int Database::getNextRepPage(int taskId){
-
-}

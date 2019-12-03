@@ -234,11 +234,11 @@ void Database::Insert(const vector<string>& query){
     row_data.data_len = len;
     row_data.null_map = null_map;
     // get the data_dir position of this data
-    size_t data_dir_pos = get_next_dir_off(table_name, len); // get next store position by the len to use the unsorted 
+    size_t data_dir_pos = get_next_dir_off(pos, len); // get next store position by the len to use the unsorted 
     unsigned short data_off = data_dir_pos & 255;   // position of data_dir in its page
     
     // get the page_pos (the position of page loaded in caceh pages)
-    int page_pos = page_exists(data_dir_pos >> 8));
+    int page_pos = page_exists(table_name, "data", data_dir_pos >> 8));
     if(page_pos == -1{
         page_pos = getNextRepPage(0);
         LoadPage(table_name, 0, replace_pageId, data_dir_pos);  
@@ -264,28 +264,39 @@ void Database::Insert(const vector<string>& query){
 
 
     
-    int t_idx = table_name_idx[table_name];
     /* update the data_meta */
     // data_cont
     // last 
-    
-    dataMeta[t_idx].data_count += 1;
-    set_last_next(dataMeta[t_idx].last);
+    dataMeta[pos].data_count += 1;
+    set_last_next(pos, data_dir_pos);
 
     /* insert in the primary key file */
-    int pri_field_idx = ((table_meta_header *)tableMeta[t_idx])->pri_field_idx;
-    string pri_name = ()tableMeta[t_idx]->
+    string pri_name(table_meta_p->fields_name[pri_feld_idx]);
     string pri_value = field_values[pri_field_idx];
-    if(((table_meta_header*)tableMeta[t_idx])->fields_type[pri_field_idx] == "int")
+    if(table_meta_p->fields_type[pri_field_idx] == "int")
     {
-        typedef typename bplus_tree<int, size_t> BTree;
+        typename bplus_tree<int, size_t> BTree;
     }else{
-        typedef typename bplus_tree<string, size_t> BTree;
+        typename bplus_tree<string, size_t> BTree;
     }
-    Trees[idx][]
-    (BTree*)(&Trees[t_idx][])
-    /* insert in the index key file */
 
+    Trees[t_idx][pri_name] = BTree();
+    (BTree*)(&Trees[t_idx][pri_name])->insert(pri_value, (data_dir_pos>>8)+row_d_p->row_off);
+
+    /* insert in the index key file */
+    int i;
+    string index_name;
+    string index_value;
+    for(i=0;i<table_meta_p->index_count;i++){
+        index_name = string(table_meta_p->indexs_name[i]);
+        for(j-0;j<table_meta_p->fields_count;j++){      // every fields 
+            if ((int)table_meta_p->idx_field_name[i][j] != 0) {
+                index_value += field_values[j] + " ";
+            }
+        }
+        Trees[t_idx][index_name] = BTree();
+        (BTree *)(&Trees[t_idx][index_name])->insert(index_value, (data_dir_pos >> 8) + row_d_p->row_off);
+    }
 }
 
 // delete query

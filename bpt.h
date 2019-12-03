@@ -39,7 +39,7 @@ struct key_meta_t{
     unsigned int un_count;  /* unsorted_map link area count  */
     unsigned int max_size;  /* max_unsorted size */
     size_t  unsorted;    /* empty key area lnk (when insert few data it will will be used) */ 
-    size_t  max_unsorted;    /* max size unsorted */
+    size_t  max_unsorted;    /* max size unsorted (56 + 8 ==> data_dir_off)*/
 
     size_t  slot;        /* where to store new block */
 };
@@ -48,8 +48,9 @@ using key_meta_header = struct key_meta_t;
 /* standord size(40) Bytes */
 struct data_meta_t{
     unsigned int data_count;  /* data count */
+    unsigned int page_count;    /* page count */
     size_t  begin_offset; /* where is the root of internal nodes */
-    size_t  slot;        /* where to store new block */
+    size_t  slot;        /* where to store new block pageId + offset */ 
     size_t  unsorted;    /* empty key area lnk (when insert few data it will will be used) */ 
     size_t  max_unsorted;    /* max size unsorted */
     unsigned int un_count;  /* unsorted_map link area count  */
