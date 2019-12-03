@@ -234,7 +234,8 @@ void Database::Insert(const vector<string>& query){
     row_data.data_len = len;
     row_data.null_map = null_map;
     // get the data_dir position of this data
-    size_t data_dir_pos = get_next_dir_off(pos, len); // get next store position by the len to use the unsorted 
+    int from_where;
+    size_t data_dir_pos = get_next_dir_off(pos, len, from_where); // get next store position by the len to use the unsorted 
     unsigned short data_off = data_dir_pos & 255;   // position of data_dir in its page
     
     // get the page_pos (the position of page loaded in caceh pages)
@@ -243,20 +244,23 @@ void Database::Insert(const vector<string>& query){
         page_pos = getNextRepPage(0);
         LoadPage(table_name, 0, replace_pageId, data_dir_pos);  
     }
-    int dir_off = 4096 - ( data_off + 1 ) * sizeof(cachePage_t);
+    int dir_offset = 4096 - ( data_off + 1 ) * sizeof(row_dic);
     // get the data * and row_t * to set value
-    row_dic * row_d_p =  (row_dic *)memCache[0] + 4096 * page_pos + dir_off;
+    row_dic * row_d_p =  (row_dic *)memCache[0] + 4096 * page_pos + dir_offset;
     row_header * data_p = (row_header *)memCache[0] + 4096 * page_pos +  row_d_p->row_off;
     // now we had get the page_pos and dir_off;
-    if((row_d_p->row_len - data.size()) > (sizeof(row_dic) + table_meta_p->min_data_len)){
-        // 后(物理上的后)一个row_dir 更改data_off 信息
-        // find the next row_dic struct by the next offset row data 
-        row_data_header * data_p_next = 
-                (row_data_header*)(data_p + sizeof(data_row_header) + data_p->data_len);
-        row_dic * row_d_p_next = row_d_p & 0xffffffffffff0000 + 4096 - (1 + (int)data_p_next->dic_off * sizeof(row_dic));
-        row_d_p_next->row_len += (row_d_p->row_len - data.size());
-        row_d_p_next->row_off -= (row_d_p->row_len - data.size());
-        memmove(data_p_next + (row_d_p->row_len - data.size()), data_p_next, row_d_p->row_len - data.size());
+    // if this data position is from the unsorted space
+    if(from == unsorted){
+        if((row_d_p->row_len - data.size()) > (sizeof(row_dic) + table_meta_p->min_data_len)){
+            // 后(物理上的后)一个row_dir 更改data_off 信息
+            // find the next row_dic struct by the next offset row data 
+            row_data_header * data_p_next = 
+                    (row_data_header*)(data_p + sizeof(data_row_header) + data_p->data_len);
+            row_dic * row_d_p_next = row_d_p & 0xffffffffffff0000 + 4096 - (1 + (int)data_p_next->dic_off * sizeof(row_dic));
+            row_d_p_next->row_len += (row_d_p->row_len - data.size());
+            row_d_p_next->row_off -= (row_d_p->row_len - data.size());
+            memmove(data_p_next + (row_d_p->row_len - data.size()), data_p_next, row_d_p->row_len - data.size());
+        }
     }
     // now we will write the data to memCache 
     void * new_p = memcpy((void*)data_p, (void *)&row_data, sizeof(row_data));

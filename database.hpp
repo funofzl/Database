@@ -27,6 +27,9 @@ const int TASK_C = PAGE_N;
 // max page cache when there are not so many tasks
 const int PAGE_PER_TASK = 4 * 2;
 
+// page count for per extend(which is the 单位 of data file add)
+const int EXTEND_SIZE = 4;  
+
 
 // max opened table
 const int MAX_OPEN_TABLE = 20;
@@ -42,6 +45,8 @@ enum FIELD_TYPE{INT, CHAR, VARCHAR, ENUM, TEXT, PRIMARY, INDEX, ERROR};
 
 const int MAX_FIELD_C = 100;
 const int MAX_INDEX_C = 10;
+
+
 
 const map<string, int> Field_t{
     {"int", 0}, {"char", 1}, {"varchar", 2}, {"enum", 3}, {"text", 4},
@@ -224,10 +229,21 @@ inline void Database::set_next_table_pos(int i){
 
 
 // get the next row_dic to store the row_data
-size_t Database::get_next_dir_off(int t_idx, int target_len){
+size_t Database::get_next_dir_off(int t_idx, int target_len, int & from_where){
+    string table_name;
+    map<string, int>::iterator iter = table_name_idx.cbegin();
+    while (iter != table_name_idx.cend())
+    {
+        if (iter->second == t_idx)
+        {
+            table_name = iter->first;
+        }
+    }
     // 大小比较
     data_meta_header * data_meta_p = &dataMeta[t_idx];
+    size_t target_off;
     if(data_meta_p->max_size > target_len){
+        target_off = data_meta_p->max_unsorted;
         int max_len = 0;
         // row_dic data_dic_p = get_dir_off(data_meta_p->unsorted);
         if(data_meta_p->un_count > 1){
@@ -250,21 +266,14 @@ size_t Database::get_next_dir_off(int t_idx, int target_len){
             data_meta_p->max_size = 0;
         }
         data_meta_p->un_count -= 1;
-        return data_meta_p->max_unsorted;
-    }
-
-    // there are no proper empty unsorted block
-    // wwe have to ccreate new block
-    
-    // get the last page to check if this page has capacity
-    int pageId = data_meta_p->slot >> 8;
-
-    string table_name;
-    map<string, int>::iterator iter = table_name_idx.cbegin();
-    while(iter != table_name_idx.cend()){
-        if(iter->second == t_idx){
-            table_name = iter->first;
+    }else{
+        // there are no proper empty unsorted block
+        // wwe have to ccreate new block
+        if(data_meta_p->slot == 0){
+            exandExtend(table_name);
         }
+        target_off = data_meta_p->slot;
+        from_where = 0;
     }
 
     int PagePos = page_exists(pageId);  // get the position loaded in memCache
@@ -273,13 +282,16 @@ size_t Database::get_next_dir_off(int t_idx, int target_len){
         RepPos = getNextRepPage(0);
         LoadPage(table_name, 0, PagePos, pageId);
     }
-    // if the free_ratio is too large
-    if(((page_header*)(memCache[0]+4096 * PagePos))->free_ratio > 80){
-        if()
-        pageId += 1;
-    }
 
-    dataMeta[t_idx].slot += ;
+    return target_off;
+    // if the free_ratio is too large
+    // if(((page_header*)(memCache[0]+4096 * PagePos))->free_ratio > 80){
+    //     if(dataMeta[t_idx].page_count == pageId + 1){
+    //         expandExtend(table_name);
+    //     }
+    //     pageId += 1;
+    // }
+
 }
 
 int getPage

@@ -95,7 +95,7 @@ using row_header = row_t;
 // 即使删除 空间不会回收 所以不需要标记id, 顺着来就行, 中间空间合并后后续顺序也不变，因为id只是个标志而已, 不一定有顺序
 struct row_direc_t{
     short row_len;  // 第一位为1时是负数，表示此块被弃用, 表示被前或后合并掉了
-                    // 为0时， 表示此块是空闲的
+                    // 平常>0 因为需要存储所指向的row_data的可用大小
     short row_off;
     size_t next;    // 56 + 8  (8 stand for position in page, 56->pageId)
 };
