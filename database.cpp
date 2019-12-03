@@ -218,13 +218,13 @@ void Database::Insert(const vector<string>& query){
     for(;i < field_values.size();i++){
         if(field_values[i] == "NULL"){
             null_map |= (1 << i);
-        }else if(table_meta_p->fields_type[i] == "int"){
+        }else if(table_meta_p->fields_type[i] == INT){
             data += fill(field_values[i], '0', table_meta_p->fields_len[i]);
             len += table_meta_p->fields_len[i];
         }else{
             if(field_values.size() > table_meta_p->fields_len[i]){
-                if(table_meta_p->fields_type == "char"){
-                    Error("Too long data for char type of " + table_meta_p->fields_name);
+                if(table_meta_p->fields_type[i] == CHAR){
+                    Error("Too long data for char type of " + table_meta_p->fields_name[i]);
                 }
             }
             data += field_values[i];
@@ -233,35 +233,42 @@ void Database::Insert(const vector<string>& query){
     }
     row_data.data_len = len;
     row_data.null_map = null_map;
+
+    /* ********************** important **************************  */
     // get the data_dir position of this data
     int from_where;
     size_t data_dir_pos = get_next_dir_off(pos, len, from_where); // get next store position by the len to use the unsorted 
     unsigned short data_off = data_dir_pos & 255;   // position of data_dir in its page
     
     // get the page_pos (the position of page loaded in caceh pages)
-    int page_pos = page_exists(table_name, "data", data_dir_pos >> 8));
-    if(page_pos == -1{
+    int page_pos = page_exists(table_name, "data", data_dir_pos >> 8);
+    if(page_pos == -1){
         page_pos = getNextRepPage(0);
-        LoadPage(table_name, 0, replace_pageId, data_dir_pos);  
+        LoadPage(table_name, 0, page_pos, data_dir_pos);  
     }
     int dir_offset = 4096 - ( data_off + 1 ) * sizeof(row_dic);
     // get the data * and row_t * to set value
     row_dic * row_d_p =  (row_dic *)memCache[0] + 4096 * page_pos + dir_offset;
     row_header * data_p = (row_header *)memCache[0] + 4096 * page_pos +  row_d_p->row_off;
+
+
     // now we had get the page_pos and dir_off;
     // if this data position is from the unsorted space
-    if(from == unsorted){
+    if(from_where == 1){
         if((row_d_p->row_len - data.size()) > (sizeof(row_dic) + table_meta_p->min_data_len)){
             // 后(物理上的后)一个row_dir 更改data_off 信息
             // find the next row_dic struct by the next offset row data 
-            row_data_header * data_p_next = 
-                    (row_data_header*)(data_p + sizeof(data_row_header) + data_p->data_len);
-            row_dic * row_d_p_next = row_d_p & 0xffffffffffff0000 + 4096 - (1 + (int)data_p_next->dic_off * sizeof(row_dic));
+            row_header * data_p_next = 
+                    (row_header*)(row_d_p + sizeof(row_header) + data_p->data_len);
+            // get row_d_p_next by the data_p_next (因为控制相连块的row_dic不一定相连(两块合并后就有这种情况))
+            row_dic * row_d_p_next = (row_dic *)get_next_row_dic_by_data((size_t)row_d_p, 
+                                                    row_d_p->row_off + sizeof(row_header) + data_p->data_len);
             row_d_p_next->row_len += (row_d_p->row_len - data.size());
             row_d_p_next->row_off -= (row_d_p->row_len - data.size());
             memmove(data_p_next + (row_d_p->row_len - data.size()), data_p_next, row_d_p->row_len - data.size());
         }
     }
+   
     // now we will write the data to memCache 
     void * new_p = memcpy((void*)data_p, (void *)&row_data, sizeof(row_data));
     new_p = memcpy(new_p, (void *)data.c_str(), data.size());
@@ -275,31 +282,30 @@ void Database::Insert(const vector<string>& query){
     set_last_next(pos, data_dir_pos);
 
     /* insert in the primary key file */
-    string pri_name(table_meta_p->fields_name[pri_feld_idx]);
-    string pri_value = field_values[pri_field_idx];
-    if(table_meta_p->fields_type[pri_field_idx] == "int")
+    string pri_name(table_meta_p->fields_name[table_meta_p->pri_field_idx]);
+    string pri_value = field_values[table_meta_p->pri_field_idx];
+    typedef bplus_tree<string, size_t> BTree;
+    if(table_meta_p->fields_type[table_meta_p->pri_field_idx] == INT)
     {
-        typename bplus_tree<int, size_t> BTree;
-    }else{
-        typename bplus_tree<string, size_t> BTree;
+        typedef bplus_tree<int, size_t> BTree;
     }
 
-    Trees[t_idx][pri_name] = BTree();
-    (BTree*)(&Trees[t_idx][pri_name])->insert(pri_value, (data_dir_pos>>8)+row_d_p->row_off);
+    Trees[pos][pri_name] = (Tree*)new BTree(string(table_name+".key").c_str());
+    ((BTree *)(Trees[pos][pri_name]))->insert(pri_value, (data_dir_pos>>8)+row_d_p->row_off);
 
     /* insert in the index key file */
     int i;
     string index_name;
     string index_value;
     for(i=0;i<table_meta_p->index_count;i++){
-        index_name = string(table_meta_p->indexs_name[i]);
+        index_name = string(table_meta_p->indexs[i]);
         for(j-0;j<table_meta_p->fields_count;j++){      // every fields 
             if ((int)table_meta_p->idx_field_name[i][j] != 0) {
                 index_value += field_values[j] + " ";
             }
         }
-        Trees[t_idx][index_name] = BTree();
-        (BTree *)(&Trees[t_idx][index_name])->insert(index_value, (data_dir_pos >> 8) + row_d_p->row_off);
+        Trees[pos][index_name] = (Tree *)new BTree(string("./" + table_name + "/" + index_name).c_str());
+        ((BTree *)(Trees[pos][index_name]))->insert(index_value, (data_dir_pos >> 8) + row_d_p->row_off);
     }
 }
 
@@ -510,7 +516,7 @@ int Database::LoadTable(string& table_name){
             key_name    :   the key which used to search(complex search)
 */
 void Database::LoadTableIndex(string& table_name, string& key_name){
-    string file_path = "./" + table_name + "/" + key_name;
+    string file_path = "./" + table_name + "/" + key_name + ".key";
     int fd = open(file_path.c_str(), O_RDWR);
     if(fd != -1){
         tab_key_fd[table_name][key_name] =fd;

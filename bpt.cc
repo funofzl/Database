@@ -40,13 +40,13 @@ inline index_t<key_t> *find(internal_node_t<key_t> &node, const key_t &key) {
     return begin(node);
 }
 
-template<class key_t>
-inline record_t<key_t> *find(leaf_node_t<key_t> &node, const key_t &key) {
+template<class key_t, class value_t>
+inline record_t<key_t, value_t> *find(leaf_node_t<key_t, value_t> &node, const key_t &key) {
     return lower_bound(begin(node), end(node), key);
 }
 
-template<class key_t>
-bplus_tree<key_t>::bplus_tree(const char *p, bool force_empty)
+template<class key_t, class value_t>
+bplus_tree<key_t, value_t>::bplus_tree(const char *p, bool force_empty)
     : fp(NULL), fp_level(0)
 {
     bzero(path, sizeof(path));
@@ -66,8 +66,8 @@ bplus_tree<key_t>::bplus_tree(const char *p, bool force_empty)
     }
 }
 
-template<typename key_t>
-int bplus_tree<key_t>::search(const key_t& key, value_t *value) const
+template<class key_t, class value_t>
+int bplus_tree<key_t, value_t>::search(const key_t& key, value_t *value) const
 {
     leaf_node_t<key_t> leaf;
     map(&leaf, search_leaf(key));
@@ -84,8 +84,8 @@ int bplus_tree<key_t>::search(const key_t& key, value_t *value) const
     }
 }
 
-template<class key_t>
-int bplus_tree<key_t>::search_range(key_t *left, const key_t &right,
+template<class key_t, class value_t>
+int bplus_tree<key_t, value_t>::search_range(key_t *left, const key_t &right,
                              value_t *values, size_t  max, bool *next) const
 {
     if (left == NULL || keycmp(*left, right) > 0)
@@ -138,8 +138,8 @@ int bplus_tree<key_t>::search_range(key_t *left, const key_t &right,
     return i;
 }
 
-template<class key_t>
-int bplus_tree<key_t>::remove(const key_t& key)
+template<class key_t, class value_t>
+int bplus_tree<key_t, value_t>::remove(const key_t& key)
 {
     internal_node_t<key_t> parent;
     leaf_node_t<key_t> leaf;
@@ -216,8 +216,8 @@ int bplus_tree<key_t>::remove(const key_t& key)
     return 0;
 }
 
-template<class key_t>
-int bplus_tree<key_t>::insert(const key_t& key, value_t value)
+template<class key_t, class value_t>
+int bplus_tree<key_t, value_t>::insert(const key_t& key, value_t value)
 {
     size_t parent = search_index(key);
     size_t offset = search_leaf(parent, key);
@@ -268,8 +268,8 @@ int bplus_tree<key_t>::insert(const key_t& key, value_t value)
     return 0;
 }
 
-template<class key_t>
-int bplus_tree<key_t>::update(const key_t& key, value_t value)
+template<class key_t, class value_t>
+int bplus_tree<key_t, value_t>::update(const key_t& key, value_t value)
 {
     size_t offset = search_leaf(key);
     leaf_node_t<key_t> leaf;
@@ -289,8 +289,8 @@ int bplus_tree<key_t>::update(const key_t& key, value_t value)
         return -1;
 }
 
-template<class key_t>
-void bplus_tree<key_t>::remove_from_index(size_t offset, internal_node_t<key_t> &node,
+template<class key_t, class value_t>
+void bplus_tree<key_t, value_t>::remove_from_index(size_t offset, internal_node_t<key_t> &node,
                                    const key_t &key)
 {
     size_t  min_n = meta.root_offset == offset ? 1 : meta.order / 2;
@@ -368,8 +368,8 @@ void bplus_tree<key_t>::remove_from_index(size_t offset, internal_node_t<key_t> 
     }
 }
 
-template<class key_t>
-bool bplus_tree<key_t>::borrow_key(bool from_right, internal_node_t<key_t> &borrower,
+template<class key_t, class value_t>
+bool bplus_tree<key_t, value_t>::borrow_key(bool from_right, internal_node_t<key_t> &borrower,
                             size_t offset)
 {
     typedef typename internal_node_t::child_t child_t;
@@ -421,8 +421,8 @@ bool bplus_tree<key_t>::borrow_key(bool from_right, internal_node_t<key_t> &borr
     return false;
 }
 
-template<class key_t>
-bool bplus_tree<key_t>::borrow_key(bool from_right, leaf_node_t<key_t> &borrower)
+template<class key_t, class value_t>
+bool bplus_tree<key_t, value_t>::borrow_key(bool from_right, leaf_node_t<key_t> &borrower)
 {
     size_t lender_off = from_right ? borrower.next : borrower.prev;
     leaf_node_t<key_t> lender;
@@ -461,8 +461,8 @@ bool bplus_tree<key_t>::borrow_key(bool from_right, leaf_node_t<key_t> &borrower
 }
 
 
-template<class key_t>
-void bplus_tree<key_t>::change_parent_child(size_t parent, const key_t &o,
+template<class key_t, class value_t>
+void bplus_tree<key_t, value_t>::change_parent_child(size_t parent, const key_t &o,
                                      const key_t &n)
 {
     internal_node_t<key_t> node;
@@ -478,15 +478,15 @@ void bplus_tree<key_t>::change_parent_child(size_t parent, const key_t &o,
     }
 }
 
-template<class key_t>
-void bplus_tree<key_t>::merge_leafs(leaf_node_t<key_t> *left, leaf_node_t<key_t> *right)
+template<class key_t, class value_t>
+void bplus_tree<key_t, value_t>::merge_leafs(leaf_node_t<key_t> *left, leaf_node_t<key_t> *right)
 {
     std::copy(begin(*right), end(*right), end(*left));
     left->n += right->n;
 }
 
-template<class key_t>
-void bplus_tree<key_t>::merge_keys(index_t<key_t> *where,
+template<class key_t, class value_t>
+void bplus_tree<key_t, value_t>::merge_keys(index_t<key_t> *where,
                             internal_node_t<key_t> &node, internal_node_t<key_t> &next, bool change_where_key)
 {
     //(end(node) - 1)->key = where->key;
@@ -498,8 +498,8 @@ void bplus_tree<key_t>::merge_keys(index_t<key_t> *where,
     node_remove(&node, &next);
 }
 
-template<class key_t>
-void bplus_tree<key_t>::insert_record_no_split(leaf_node_t<key_t> *leaf,
+template<class key_t, class value_t>
+void bplus_tree<key_t, value_t>::insert_record_no_split(leaf_node_t<key_t> *leaf,
                                         const key_t &key, const value_t &value)
 {
     record_t *where = upper_bound(begin(*leaf), end(*leaf), key);
@@ -510,8 +510,8 @@ void bplus_tree<key_t>::insert_record_no_split(leaf_node_t<key_t> *leaf,
     leaf->n++;
 }
 
-template<class key_t>
-void bplus_tree<key_t>::insert_key_to_index(size_t offset, const key_t &key,
+template<class key_t, class value_t>
+void bplus_tree<key_t, value_t>::insert_key_to_index(size_t offset, const key_t &key,
                                      size_t old, size_t after)
 {
     if (offset == 0) {
@@ -585,8 +585,8 @@ void bplus_tree<key_t>::insert_key_to_index(size_t offset, const key_t &key,
     }
 }
 
-template<class key_t>
-void bplus_tree<key_t>::insert_key_to_index_no_split(internal_node_t<key_t> &node,
+template<class key_t, class value_t>
+void bplus_tree<key_t, value_t>::insert_key_to_index_no_split(internal_node_t<key_t> &node,
                                               const key_t &key, size_t value)
 {
     index_t<key_t> *where = upper_bound(begin(node), end(node) - 1, key);
@@ -602,8 +602,8 @@ void bplus_tree<key_t>::insert_key_to_index_no_split(internal_node_t<key_t> &nod
     node.n++;
 }
 
-template<class key_t>
-void bplus_tree<key_t>::reset_index_children_parent(index_t<key_t> *begin, index_t<key_t> *end,
+template<class key_t, class value_t>
+void bplus_tree<key_t, value_t>::reset_index_children_parent(index_t<key_t> *begin, index_t<key_t> *end,
                                              size_t parent)
 {
     // this function can change both internal_node_t<key_t> and leaf_node_t's parent
@@ -636,8 +636,8 @@ size_t bplus_tree<key_t>::search_index(const key_t &key) const
     return org;
 }
 
-template<class key_t>
-size_t bplus_tree<key_t>::search_leaf(size_t index, const key_t &key) const
+template<class key_t, class value_t>
+size_t bplus_tree<key_t, value_t>::search_leaf(size_t index, const key_t &key) const
 {
     internal_node_t<key_t> node;
     map(&node, index);
@@ -646,9 +646,9 @@ size_t bplus_tree<key_t>::search_leaf(size_t index, const key_t &key) const
     return i->child;
 }
 
-template<class key_t>
+template<class key_t, class value_t>
 template<class T>
-void bplus_tree<key_t>::node_create(size_t offset, T *node, T *next)
+void bplus_tree<key_t, value_t>::node_create(size_t offset, T *node, T *next)
 {
     // new sibling node
     next->parent = node->parent;
@@ -665,9 +665,9 @@ void bplus_tree<key_t>::node_create(size_t offset, T *node, T *next)
     unmap(&meta, OFFSET_META);
 }
 
-template<class key_t>
+template<class key_t, class value_t>
 template<class T>
-void bplus_tree<key_t>::node_remove(T *prev, T *node)
+void bplus_tree<key_t, value_t>::node_remove(T *prev, T *node)
 {
     unalloc(node, prev->next);
     prev->next = node->next;
@@ -680,8 +680,8 @@ void bplus_tree<key_t>::node_remove(T *prev, T *node)
     unmap(&meta, OFFSET_META);
 }
 
-template<class key_t>
-void bplus_tree<key_t>::init_from_empty()
+template<class key_t, class value_t>
+void bplus_tree<key_t, value_t>::init_from_empty()
 {
     // init default meta
     bzero(&meta, sizeof(key_meta_header));

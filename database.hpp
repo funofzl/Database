@@ -132,7 +132,7 @@ protected:
     vector<Tree> Trees;
     char * memCache[TASK_C];    // addres of Load pages
     // Store all table_name which this page store and the PAGE_TYPE of page
-    vector<vector<cachePage_t>> pagetypes;    // task(thread)->pageId
+    vector<vector<cachePage_t> > pagetypes;    // task(thread)->pageId
     int ReQueue[TASK_C][PAGE_N];               // log the replace sequence of pages
     
 
@@ -151,14 +151,14 @@ protected:
     int tableData[MAX_OPEN_TABLE];   // opened table's table_data(fd object wait for mmap)
     map<string, map<string, int>> tab_key_fd;    // open(table key) ==> fd (wait for mmap)
 
-    vector<map<string, Tree> > Trees(MAX_OPEN_TABLE);   
+    vector<map<string, Tree*> > Trees;   
 
     vector<Task> Tasks;                 // Store current waiting tasks 
     map<string, vector<int>> Locks;  // Store current Lock information
 protected:
     void create_parse(const int & type, const vector<string>& query, string & table_name, map<string, string>& fields_result);
     void CreateFile(string table_name, map<string, string> fields_result);
-    void LoadTable(string & table_name);
+    int LoadTable(string & table_name);
     void LoadTableIndex(string& table_name, string& key_name);
     bool LoadPage(string & table_name, int memCacheId, int posId, size_t pageId);
     
@@ -176,18 +176,25 @@ protected:
     void set_last_next(int t_idx, size_t dir_off);
     void set_dir_next(size_t prv_dic, size_t next_dic_off);
     size_t get_dir_next(size_t dir_off);
+
+    // 因为控制相连块的row_dic不一定相连(两块合并后就有这种情况)
+    size_t get_next_row_dic_by_data(size_t from_dic, short row_off){
+        while(((row_dic*)from_dic)->row_off != row_off){
+            from_dic += sizeof(row_dic);
+        }
+        return from_dic;
+    }
     
     //page
     int get_page_count(string & table_name, char * expand_type);
 
-    bool table_exists(string table_name);
-    int page_exists(size_t pageId);
+    bool table_exists(string & table_name);
+    int page_exists(const string &table_name, const char *tp, size_t pageId);
 };
 
 
 Database::Database(){
-    Cache_table.reserve(TASK_C);
-    Cache_pages.reserve(PAGE_C);
+   
     
 }
 
@@ -283,13 +290,6 @@ size_t Database::get_next_dir_off(int t_idx, int target_len, int & from_where){
         from_where = 0;
     }
 
-    int PagePos = page_exists(pageId);  // get the position loaded in memCache
-    if (!PagePos)
-    {
-        RepPos = getNextRepPage(0);
-        LoadPage(table_name, 0, PagePos, pageId);
-    }
-
     return target_off;
     // if the free_ratio is too large
     // if(((page_header*)(memCache[0]+4096 * PagePos))->free_ratio > 80){
@@ -311,7 +311,7 @@ int Database::getNextRepPage(int taskId){
         }
     }
     int target = ReQueue[taskId][i-1];
-    memmove(&ReQueue[taskId][1], ReQueue[taskId][0], PAGE_N);
+    memmove(&ReQueue[taskId][1], &ReQueue[taskId][0], PAGE_N);
     ReQueue[taskId][0] = target;
     return target;
 }
@@ -341,7 +341,7 @@ void Database::set_dir_next(size_t prv_dic, size_t next_dic_off){
     munmap(buf, sizeof(row_dic), MS_SYNC);
 }
 
-size_t Database::get_dir_next(size_t dir_off){
+size_t Database::get_dir_next(size_t prv_dic){
     size_t pageId = (prv_dic >> 8) << 8;
     int page_in_off = 4096 - (1 + (prv_dic & 255)) * sizeof(row_dic);
     int off = (pageId + 1) * 4096 + page_in_off;
@@ -356,8 +356,8 @@ size_t Database::get_dir_next(size_t dir_off){
 
 int Database::get_page_count(string & table_name, char * expand_ob){
     int t_idx = table_name_idx[table_name];
-    map<string, key_meta_header>::const_iterator iter = indexs_meta.find(string(expand_ob));
-    if(iter == indexs_meta.cend()){
+    map<string, key_meta_header>::const_iterator iter = indexs_meta[t_idx].find(string(expand_ob));
+    if(iter == indexs_meta[t_idx].cend()){
         LoadTableIndex(table_name, string(expand_ob));
     }
     return indexs_meta[t_idx][string(expand_ob)].page_count;
@@ -366,7 +366,7 @@ int Database::get_page_count(string & table_name, char * expand_ob){
 
 // ************* exists *****************//
 
-bool Database::table_exists(string table_name)
+bool Database::table_exists(string & table_name)
 {
     fstream fs("table_name.txt", ios::out);
     char buffer[20];
@@ -384,15 +384,17 @@ bool Database::table_exists(string table_name)
 int Database::page_exists(const string &table_name, const char *tp, size_t pageId)
 {
     int i = 0, j = 0;
-    for (i = 0; i < pagetypes[0].size(); i++)
-    {
-        if (pagetypes[0][i].table_name == table_name)
+    if(pagetypes.size() > 0){
+        for (i = 0; i < pagetypes[0].size(); i++)
         {
-            if (pagetypes[0][i].pageId == pageId)
+            if (pagetypes[0][i].table_name == table_name)
             {
-                if (strcmp(pagetypes[0][i].type_name, tp) == 0)
+                if (pagetypes[0][i].pageId == pageId)
                 {
-                    return i;
+                    if (strcmp(pagetypes[0][i].type_name, tp) == 0)
+                    {
+                        return i;
+                    }
                 }
             }
         }
