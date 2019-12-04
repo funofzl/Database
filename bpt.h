@@ -119,7 +119,7 @@ struct index_t {
 /***
  * internal node block
  ***/
-template<class key_t, class value_t>
+template<class key_t>
 struct internal_node_t {
     typedef index_t<key_t> * child_t;
 

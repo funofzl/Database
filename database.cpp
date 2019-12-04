@@ -219,12 +219,13 @@ void Database::Insert(const vector<string>& query){
         if(field_values[i] == "NULL"){
             null_map |= (1 << i);
         }else if(table_meta_p->fields_type[i] == INT){
-            data += fill(field_values[i], '0', table_meta_p->fields_len[i]);
+            fill(field_values[i], '0', table_meta_p->fields_len[i]);
+            data += field_values[i];
             len += table_meta_p->fields_len[i];
         }else{
             if(field_values.size() > table_meta_p->fields_len[i]){
                 if(table_meta_p->fields_type[i] == CHAR){
-                    Error("Too long data for char type of " + table_meta_p->fields_name[i]);
+                    Error("Too long data for char type of " + string(table_meta_p->fields_name[i]));
                 }
             }
             data += field_values[i];
@@ -318,14 +319,16 @@ void Database::Update()
 {}
 
 // selectc query
-void Database::Select()
-{}
+void Database::Select(const vector<string>& query){
+     
+}
 
 
 
 
 
-void Database::CreateFile(string& table_name, map<string, string> fields_result) {
+
+void Database::CreateFile(string& table_name, map<string, string>& fields_result) {
     // First. write the tablename to table_name.txt(whch contains all table names)
 	fstream fs("table_name.txt");
 	if(table_exists(table_name)){
@@ -412,8 +415,8 @@ void Database::CreateFile(string& table_name, map<string, string> fields_result)
     fs.write((const char *)&table_meta, sizeof(table_meta));
     fs.clear();
 
-    if(!access("./" + table_name)){
-        mkdir("./" + table_name);
+    if(!access((string("./") + table_name).c_str(), W_OK)){
+        mkdir((string("./") + table_name).c_str());
     }
     // Third. Set the key file header
     key_meta_t key_meta;
@@ -521,7 +524,7 @@ void Database::LoadTableIndex(string& table_name, string& key_name){
     if(fd != -1){
         tab_key_fd[table_name][key_name] =fd;
         int pos = table_name_idx[table_name]; 
-        write(fd, (const void *)&(indexs_meta[pos]).second, sizeof(key_meta_header));
+        write(fd, (const void *)&(indexs_meta[pos][key_name]), sizeof(key_meta_header));
     }else{
         Error("Error while opening key file");
     }
@@ -547,7 +550,11 @@ bool Database::LoadPage(string & table_name, int memCacheId, int posId, size_t p
     return true;
 }
 
-
+/*
+    @params:
+        table_name  : table_name
+        expand_ob   : "data" {primary_key_name} {index_key_name}
+*/
 void Database::expandExtend(string & table_name, char * expand_ob){
     int page_count = get_page_count(table_name, expand_ob);
     page_header pageHead;
@@ -558,5 +565,31 @@ void Database::expandExtend(string & table_name, char * expand_ob){
     memcpy(&pageHead.record_type, expand_ob, strlen(expand_ob)); // DATA PRI_K COM_K
     pageHead.row_dic_size = 0;      // row_dic count = 0
     pageHead.row_space = 0;         // there are not data
+    
+    off_t truncate_len = (page_count + EXTEND_SIZE + 1) * 4096;   // origin size + extens size + header size
+    int target_fd;
+    if(expand_ob == "data"){
+        const char * path = string(table_name + ".db").c_str();
+        truncate((const char *)path, truncate_len);     // resize(increase) the size of (index key) file 
+        target_fd = tableData[table_name_idx[table_name]];
+        dataMeta[table_name_idx[table_name]].slot = truncate_len - 4096 * EXTEND_SIZE + sizeof(page_header);
+    }else if(strcmp(expand_ob, get_table_pri_name(table_name)) == 0){
+        const char * path = string(table_name + ".key").c_str();
+        truncate((const char *)path, truncate_len);     // resize(increase) the size of (index key) file 
+        target_fd = tab_key_fd[table_name][string(expand_ob)];
+        tablePriMeta[table_name_idx[table_name]].slot = truncate_len - 4096 * EXTEND_SIZE + sizeof(page_header);
+    }else{
+        const char * path = string("./" + table_name + "/" + ".db").c_str();
+        truncate(path, truncate_len);       // resize(increase) the size of (index key) file 
+        string index_temp = string(expand_ob);
+        target_fd = tab_key_fd[table_name][index_temp]; // get the fd to set value
+        // update the slot(because it must be that there is no space)
+        indexs_meta[table_name_idx[table_name]][index_temp].slot = truncate_len - 4096 * EXTEND_SIZE + sizeof(page_header);
+    }
+    // lseek and set theh page header in file
+    for(int i=EXTEND_SIZE;i>0;i++){
+        lseek(target_fd, i*(-4096), SEEK_END);
+        write(target_fd, &pageHead, sizeof(key_meta_header));
+    }
 }
 

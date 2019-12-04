@@ -121,12 +121,12 @@ public:
     Database();
     ~Database();
     void QueryParse(int type, const vector<string> query);
-    void Create(const vector<string> query);
+    void Create(const vector<string>& query);
     void Drop(const string& table_name);
     void Insert(const vector<string>& query);
     void Delete();
     void Update();
-    void Select();
+    void Select(const vector<string>& query);
     void Error(string err_str);
 protected:
     vector<Tree> Trees;
@@ -156,8 +156,8 @@ protected:
     vector<Task> Tasks;                 // Store current waiting tasks 
     map<string, vector<int>> Locks;  // Store current Lock information
 protected:
-    void create_parse(const int & type, const vector<string>& query, string & table_name, map<string, string>& fields_result);
-    void CreateFile(string table_name, map<string, string> fields_result);
+    void create_parse(const vector<string>& query, string & table_name, map<string, string>& fields_result);
+    void CreateFile(string& table_name, map<string, string>& fields_result);
     int LoadTable(string & table_name);
     void LoadTableIndex(string& table_name, string& key_name);
     bool LoadPage(string & table_name, int memCacheId, int posId, size_t pageId);
@@ -188,6 +188,7 @@ protected:
     //page
     int get_page_count(string & table_name, char * expand_type);
 
+    const char *get_table_pri_name(string& table_name);
     bool table_exists(string & table_name);
     int page_exists(const string &table_name, const char *tp, size_t pageId);
 };
@@ -363,6 +364,11 @@ int Database::get_page_count(string & table_name, char * expand_ob){
     return indexs_meta[t_idx][string(expand_ob)].page_count;
 }
 
+
+const char * Database::get_table_pri_name(string& table_name){
+    table_meta_header * table_meta_p = (table_meta_header *)tableMeta[table_name_idx[table_name]];
+    return table_meta_p->pri_field_name;
+}
 
 // ************* exists *****************//
 
